@@ -1,0 +1,13 @@
+# private data (old SQLite app, exports, example photos)
+data/
+bsp/
+*.sqlite
+tree-of-life-*.json
+meine-sammlung*.json
+
+# secrets / local tooling
+.env
+.venv/
+node_modules/
+__pycache__/
+.pytest_cache/

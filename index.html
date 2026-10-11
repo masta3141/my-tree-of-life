@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tree of Life</title>
+<meta name="description" content="Persönlicher Stammbaum: Organismen erfassen, von Gemini bestimmen lassen und als minimalen Baum ansehen.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌳</text></svg>">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+  :root {
+    --bg: #f7f6f2; --panel: #ffffff; --fg: #1f2421; --muted: #6b716d; --line: #d9d6cc;
+    --accent: #2f7d4f; --accent-fg: #fff; --warn: #a15c00; --danger: #b3261e;
+    --link: #b9b4a6; --node: #2f7d4f; --leaf: #c8a24a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141715; --panel: #1c201d; --fg: #e6e8e4; --muted: #9aa19c; --line: #2f3531;
+      --accent: #5bbf84; --accent-fg: #0d130f; --warn: #e3a64a; --danger: #ff8a80;
+      --link: #4a514c; --node: #5bbf84; --leaf: #e0bf6a;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .app { display: grid; grid-template-columns: 360px 1fr; height: 100vh; }
+  aside { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 20px 16px; }
+  main { position: relative; overflow: hidden; }
+  h1 { font-size: 18px; margin: 0 0 16px; letter-spacing: .01em; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 24px 0 8px; }
+  textarea, input[type=text] { width: 100%; font: inherit; color: inherit; background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  textarea { resize: vertical; min-height: 56px; }
+  .drop { display: block; margin-top: 8px; border: 1.5px dashed var(--line); border-radius: 8px; padding: 12px;
+    text-align: center; color: var(--muted); cursor: pointer; }
+  .drop.over { border-color: var(--accent); color: var(--accent); }
+  .drop img { max-width: 100%; max-height: 160px; border-radius: 6px; display: block; margin: 0 auto; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+    border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: .5; cursor: progress; }
+  .row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-top: 14px; background: var(--bg); }
+  .card .sci { font-style: italic; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+  .warn { color: var(--warn); }
+  .err { color: var(--danger); margin-top: 8px; }
+  .lineage { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .alts button { font-size: 12px; padding: 4px 8px; }
+  ul.list { list-style: none; padding: 0; margin: 0; }
+  ul.list li { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  ul.list li img, ul.list li .ph { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex: none; background: var(--line); }
+  ul.list li .t { flex: 1; min-width: 0; }
+  ul.list li .t div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  ul.list li button { border: none; background: none; color: var(--muted); padding: 4px; }
+  ul.list li button:hover { color: var(--danger); }
+  svg { width: 100%; height: 100%; display: block; cursor: grab; }
+  .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); pointer-events: none; }
+  [hidden] { display: none !important; }
+  #detail { position: absolute; top: 16px; right: 16px; width: 380px; max-height: calc(100% - 32px); overflow-y: auto;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px;
+    box-shadow: 0 8px 28px #0003; }
+  #detail .close { position: sticky; top: 0; float: right; border: none; background: none; color: var(--muted); font-size: 18px; padding: 0 4px; }
+  #detail h3 { margin: 0 0 2px; font-size: 18px; }
+  #detail .hero { width: 100%; max-height: 240px; object-fit: cover; border-radius: 8px; margin: 8px 0 4px; display: block; }
+  .credit { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .credit a { color: inherit; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
+  .gallery .ph { position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; background: var(--line);
+    border: 2px solid transparent; cursor: pointer; }
+  .gallery .ph.cover { border-color: var(--accent); }
+  .gallery .ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .gallery .ph .acts { position: absolute; inset: auto 0 0 0; display: none; justify-content: space-between;
+    background: #000a; padding: 2px; }
+  .gallery .ph:hover .acts { display: flex; }
+  .gallery .ph .acts button { border: none; background: none; color: #fff; padding: 0 4px; font-size: 13px; }
+  .gallery .add { display: grid; place-items: center; aspect-ratio: 1; border: 1.5px dashed var(--line); border-radius: 6px;
+    color: var(--muted); cursor: pointer; font-size: 22px; }
+  .gallery .add.over { border-color: var(--accent); color: var(--accent); }
+  .cands { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 8px; }
+  .cand { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--bg); font-size: 11px; }
+  .cand.rec { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .cand.bad { opacity: .45; }
+  .cand img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
+  .cand .meta { padding: 6px; }
+  .cand .meta div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cand button { width: 100%; margin-top: 4px; font-size: 12px; padding: 4px; }
+  .badge { display: inline-block; background: var(--accent); color: var(--accent-fg); border-radius: 4px; padding: 0 5px; font-weight: 600; }
+  #detail h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 16px 0 6px; }
+  #detail p { margin: 0 0 6px; }
+  #detail ul { margin: 0; padding-left: 18px; }
+  #detail textarea { min-height: 70px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg);
+    cursor: pointer; color: var(--fg); }
+  .chip:hover { border-color: var(--accent); }
+  .chip .r { color: var(--muted); font-size: 10px; margin-left: 4px; }
+  .clickable { cursor: pointer; }
+  ul.list li.clickable:hover .t div:first-child { color: var(--accent); }
+  .node-hit:hover circle { stroke: var(--fg); stroke-width: 2px; }
+  .link { fill: none; stroke: var(--link); stroke-width: 1.5px; }
+  .link-hit { fill: none; stroke: transparent; stroke-width: 12px; }
+  .skip { font-size: 10px; fill: var(--muted); }
+  .rank-head { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; fill: var(--muted); }
+  .n-name { font-size: 13px; font-weight: 600; fill: var(--fg); }
+  .n-sub { font-size: 11px; fill: var(--muted); }
+  .n-sci { font-size: 11px; font-style: italic; fill: var(--muted); }
+  .halo { paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
+  #tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 10px; font-size: 12px; max-width: 280px; display: none; box-shadow: 0 4px 16px #0002; }
+  .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .head h1 { margin: 0; }
+  .icon-btn { border: none; background: none; font-size: 18px; padding: 2px 6px; color: var(--muted); }
+  .icon-btn:hover { color: var(--fg); }
+  .settings { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 14px; background: var(--bg); }
+  .settings label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+  .settings input { background: var(--panel); }
+  .notice { border: 1px solid var(--warn); color: var(--fg); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; font-size: 13px; }
+  .notice a, .settings a { color: var(--accent); }
+  .foot { margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .foot .row { margin-top: 6px; }
+  .foot button { font-size: 12px; padding: 5px 10px; }
+  @media (max-width: 760px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: auto 70vh; height: auto; }
+    aside { border-right: none; border-bottom: 1px solid var(--line); }
+    #detail { left: 8px; right: 8px; top: 8px; width: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="head">
+      <h1>🌳 Tree of Life</h1>
+      <button class="icon-btn" id="btnSettings" title="Einstellungen">⚙</button>
+    </div>
+    <div class="notice" id="noKey" hidden>
+      Für die Bestimmung brauchst du einen eigenen, kostenlosen
+      <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Gemini-API-Key</a>.
+      Trag ihn unter ⚙ ein.
+    </div>
+    <div class="settings" id="settings" hidden>
+      <label for="setKey">Gemini-API-Key</label>
+      <input type="password" id="setKey" autocomplete="off" placeholder="AIza…">
+      <label for="setModel">Modell</label>
+      <input type="text" id="setModel">
+      <p class="small muted">Key und Sammlung bleiben in diesem Browser. Der Key wird nur an Google gesendet.
+        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Key erstellen</a></p>
+      <div class="row"><button class="primary" id="btnSaveSettings">Speichern</button><button id="btnCloseSettings">Schließen</button></div>
+    </div>
+
+    <textarea id="text" placeholder="Organismus, z.B. „Eichhörnchen“, „Kreuzspinne“, „die Kastanie vor dem Haus“"></textarea>
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept="image/*" hidden>
+      <span id="dropText">Bild hierher ziehen oder klicken (optional)</span>
+    </label>
+    <div class="row"><button class="primary" id="btnIdentify">Bestimmen</button></div>
+    <div id="error" class="err"></div>
+    <div id="proposal"></div>
+
+    <h2>Erfasst <span id="count" class="muted"></span></h2>
+    <ul class="list" id="list"></ul>
+
+    <div class="foot">
+      <div class="small muted">Deine Sammlung liegt nur in diesem Browser. Sichere sie ab und zu.</div>
+      <div class="row">
+        <button id="btnExport">⬇ Exportieren</button>
+        <label><button id="btnImport">⬆ Importieren</button><input type="file" id="importFile" accept="application/json,.json" hidden></label>
+      </div>
+      <div class="small muted" id="ioState"></div>
+    </div>
+  </aside>
+  <main>
+    <svg id="svg"></svg>
+    <div class="empty" id="empty" hidden>Noch nichts erfasst. Fang links an.</div>
+    <div id="tip"></div>
+    <div id="detail" hidden></div>
+  </main>
+</div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
