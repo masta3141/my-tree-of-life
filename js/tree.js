@@ -5,7 +5,7 @@
 // point, or the first taxon of a branch below a branching point (the one that
 // distinguishes the branches); other single-child chains are collapsed onto the edge.
 //
-// Taxon:    { key, name, rank, name_de }
+// Taxon:    { key, name, rank, name_de, name_en }
 // Organism: { id, label, lineage: Taxon[], image }
 
 // ranks above species: an organism identified only this far keeps its own taxon node,
@@ -13,7 +13,7 @@
 const COARSE = new Set(["domain", "kingdom", "subkingdom", "phylum", "subphylum", "class", "subclass", "order",
   "suborder", "family", "subfamily", "tribe", "genus", "subgenus"]);
 
-const taxonOut = (t) => ({ key: t.key, name: t.name, rank: t.rank, name_de: t.name_de ?? null });
+const taxonOut = (t) => ({ key: t.key, name: t.name, rank: t.rank, name_de: t.name_de ?? null, name_en: t.name_en ?? null });
 
 function organismOut(o, collapsed) {
   return {
@@ -66,7 +66,7 @@ export function buildTree(organisms) {
   if (trees.length === 1) return trees[0];
   return {
     type: "taxon",
-    taxon: { key: "life", name: "Leben", rank: "root", name_de: null },
+    taxon: { key: "life", name: "Leben", rank: "root", name_de: null, name_en: null },
     collapsed: [],
     children: trees.sort((a, b) => cmp(a.taxon.name, b.taxon.name)),
   };

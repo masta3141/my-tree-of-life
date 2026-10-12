@@ -14,7 +14,9 @@ die Domäne, mit jedem weiteren wächst er genau dort, wo sich die Wege trennen.
 - Beschreibungen und kennzeichnende Merkmale für jeden Knoten
 - Eigene Bilder pro Organismus, plus Suche nach frei lizenzierten Fotos bei iNaturalist und
   Wikimedia Commons (von Gemini bewertet, mit Urheber- und Lizenzangabe)
-- Export/Import der Sammlung als Datei
+- Export/Import der Sammlung als Datei (erneuter Import ergänzt vorhandene Einträge statt sie zu verdoppeln)
+- Deutsch und Englisch (Flagge neben ⚙): Namen, Beschreibungen und Bezeichnungen werden in beiden Sprachen
+  gespeichert, Fehlendes ergänzt Gemini (⚙ → „Sammlung übersetzen“)
 
 ## Datenschutz
 
@@ -52,6 +54,7 @@ Tests der Baum-Logik: `npm test` (Node ≥ 20, keine Abhängigkeiten).
 | `js/gemini.js` | Gemini-REST-Aufrufe |
 | `js/images.js` | Bildsuche iNaturalist / Commons mit Lizenzfilter |
 | `js/settings.js` | API-Key und Modell (pro Browser) |
+| `js/i18n.js` | Sprache, UI-Texte Deutsch/Englisch, zweisprachige Datenfelder |
 
 ## Bildlizenzen
 

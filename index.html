@@ -134,6 +134,10 @@
     border-radius: 8px; padding: 8px 10px; font-size: 12px; max-width: 280px; display: none; box-shadow: 0 4px 16px #0002; }
   .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
   .head h1 { margin: 0; }
+  .head-btns { display: flex; align-items: center; gap: 2px; }
+  .flag { display: grid; place-items: center; padding: 4px 6px; opacity: .85; }
+  .flag:hover { opacity: 1; }
+  .flag svg { width: 20px; height: 13px; display: block; border-radius: 2px; box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
   .icon-btn { border: none; background: none; font-size: 18px; padding: 2px 6px; color: var(--muted); }
   .icon-btn:hover { color: var(--fg); }
   .settings { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 14px; background: var(--bg); }
@@ -172,61 +176,63 @@
   <aside>
     <div class="head">
       <h1>🌳 My Tree of Life</h1>
-      <button class="icon-btn" id="btnSettings" title="Einstellungen">⚙</button>
+      <div class="head-btns">
+        <button class="icon-btn flag" id="btnLang"></button>
+        <button class="icon-btn" id="btnSettings" data-i18n-title="settings">⚙</button>
+      </div>
     </div>
-    <div class="notice" id="noKey" hidden>
-      Für die Bestimmung brauchst du einen eigenen, kostenlosen
-      <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Gemini-API-Key</a>.
-      Trag ihn unter ⚙ ein.
-    </div>
+    <div class="notice" id="noKey" data-i18n-html="noKey" hidden></div>
     <div class="settings" id="settings" hidden>
-      <label for="setKey">Gemini-API-Key</label>
+      <label for="setKey" data-i18n="set.key"></label>
       <input type="password" id="setKey" autocomplete="off" placeholder="AIza…">
-      <label for="setModel">Modell</label>
+      <label for="setModel" data-i18n="set.model"></label>
       <input type="text" id="setModel">
-      <p class="small muted">Key und Sammlung bleiben in diesem Browser. Der Key wird nur an Google gesendet.
-        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Key erstellen</a></p>
-      <div class="row"><button class="primary" id="btnSaveSettings">Speichern</button><button id="btnCloseSettings">Schließen</button></div>
-      <label style="margin-top:18px">Sammlung sichern</label>
-      <div class="small muted">Deine Sammlung liegt nur in diesem Browser. Sichere sie ab und zu.</div>
+      <p class="small muted" data-i18n-html="set.privacy"></p>
+      <div class="row"><button class="primary" id="btnSaveSettings" data-i18n="save"></button><button id="btnCloseSettings" data-i18n="close"></button></div>
+      <label style="margin-top:18px" data-i18n="set.backup"></label>
+      <div class="small muted" data-i18n="set.backupHint"></div>
       <div class="row">
-        <button id="btnExport">⬇ Exportieren</button>
-        <button id="btnImport">⬆ Importieren</button><input type="file" id="importFile" accept="application/json,.json" hidden>
+        <button id="btnExport" data-i18n="export"></button>
+        <button id="btnImport" data-i18n="import"></button><input type="file" id="importFile" accept="application/json,.json" hidden>
       </div>
       <div class="small muted" id="ioState"></div>
+      <label style="margin-top:18px" data-i18n="set.translate"></label>
+      <div class="small muted" data-i18n="set.translateHint"></div>
+      <div class="row"><button id="btnTranslate" data-i18n="set.translateBtn"></button></div>
+      <div class="small muted" id="trState"></div>
     </div>
 
     <div class="composer" id="drop">
-      <div class="thumb" id="thumb" hidden><img id="thumbImg" alt=""><button id="btnClearImg" title="Bild entfernen">✕</button></div>
-      <textarea id="text" rows="1" placeholder="Organismus, z.B. „Kreuzspinne“"></textarea>
-      <label class="icon-btn" title="Bild hinzufügen">📷<input type="file" id="file" accept="image/*" hidden></label>
-      <button class="primary" id="btnIdentify" title="Bestimmen">➜</button>
+      <div class="thumb" id="thumb" hidden><img id="thumbImg" alt=""><button id="btnClearImg" data-i18n-title="removeImage">✕</button></div>
+      <textarea id="text" rows="1" data-i18n-placeholder="input.placeholder"></textarea>
+      <label class="icon-btn" data-i18n-title="addImage">📷<input type="file" id="file" accept="image/*" hidden></label>
+      <button class="primary" id="btnIdentify" data-i18n-title="identify">➜</button>
     </div>
     <div id="status" hidden></div>
     <div id="error" class="err"></div>
     <div id="proposal"></div>
 
     <details id="listBox" open>
-      <summary><h2>Erfasst <span id="count" class="muted"></span></h2></summary>
+      <summary><h2><span data-i18n="recorded"></span> <span id="count" class="muted"></span></h2></summary>
       <ul class="list" id="list"></ul>
     </details>
 
   </aside>
   <main>
     <svg id="svg"></svg>
-    <div class="empty" id="empty" hidden>Noch nichts erfasst. Fang links an.</div>
+    <div class="empty" id="empty" data-i18n="empty" hidden></div>
     <div id="tip"></div>
-    <button class="fs-btn" id="btnFs" title="Vollbild">⛶</button>
-    <button class="fs-back" id="btnFsBack">← Zurück</button>
+    <button class="fs-btn" id="btnFs" data-i18n-title="fullscreen">⛶</button>
+    <button class="fs-back" id="btnFsBack" data-i18n="back"></button>
     <div id="detail" hidden></div>
   </main>
 </div>
 <script>
   // Show startup/runtime errors on the page, e.g. on phones without a console
-  const showErr = (m) => { const el = document.getElementById("error"); if (el) el.textContent = "Fehler: " + m; };
+  const showErr = (m) => { const el = document.getElementById("error"); if (el) el.textContent = (document.documentElement.lang === "en" ? "Error: " : "Fehler: ") + m; };
   addEventListener("error", (e) => showErr(e.message));
   addEventListener("unhandledrejection", (e) => showErr(e.reason?.message || e.reason));
 </script>
-<script type="module" src="js/app.js?v=5"></script>
+<script type="module" src="js/app.js?v=6"></script>
 </body>
 </html>

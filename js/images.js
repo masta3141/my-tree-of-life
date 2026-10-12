@@ -1,5 +1,7 @@
 // Freely licensed image candidates from iNaturalist and Wikimedia Commons.
 
+import { t } from "./i18n.js";
+
 // iNaturalist license codes we accept (no "all rights reserved", no -nd)
 const INAT_LICENSES = {
   "cc0": "CC0",
@@ -73,7 +75,7 @@ export async function commons(name, limit = 8) {
       // Commons only serves thumbnails in standard widths (330, 500, 960, 1280, ...)
       thumb: ii.thumburl.replace(/\/\d+px-/, "/330px-"),
       url: ii.thumburl,
-      license: stripHtml(meta.LicenseShortName?.value) || "siehe Quelle",
+      license: stripHtml(meta.LicenseShortName?.value) || t("seeSource"),
       license_url: meta.LicenseUrl?.value || null,
       credit: stripHtml(meta.Artist?.value) || "Wikimedia Commons",
       page_url: ii.descriptionurl,
@@ -91,9 +93,9 @@ export async function candidates(name) {
 export async function fetchImage(url) {
   const host = new URL(url).hostname;
   if (!ALLOWED_IMAGE_HOSTS.some((h) => host === h || host.endsWith("." + h))) {
-    throw new Error("Nur Bilder von iNaturalist oder Wikimedia Commons");
+    throw new Error(t("err.imageHost"));
   }
   const r = await fetch(url);
-  if (!r.ok) throw new Error(`Download fehlgeschlagen: ${r.status}`);
+  if (!r.ok) throw new Error(t("err.download", r.status));
   return r.blob();
 }

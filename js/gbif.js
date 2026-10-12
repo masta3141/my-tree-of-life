@@ -14,7 +14,7 @@ export const KINGDOM_TO_DOMAIN = {
   Viruses: "Viruses",
 };
 
-export const domainTaxon = (name) => ({ key: `dom:${name}`, name, rank: "domain", name_de: null });
+export const domainTaxon = (name) => ({ key: `dom:${name}`, name, rank: "domain", name_de: null, name_en: null });
 
 // Returns { lineage, match_type, confidence, rank } or null.
 export async function match(name) {
@@ -26,12 +26,12 @@ export async function match(name) {
   const domain = KINGDOM_TO_DOMAIN[d.kingdom];
   const lineage = domain ? [domainTaxon(domain)] : [];
   for (const rank of RANKS) {
-    if (d[rank] && d[`${rank}Key`]) lineage.push({ key: String(d[`${rank}Key`]), name: d[rank], rank, name_de: null });
+    if (d[rank] && d[`${rank}Key`]) lineage.push({ key: String(d[`${rank}Key`]), name: d[rank], rank, name_de: null, name_en: null });
   }
   // infraspecific matches (subspecies, variety, ...) sit below species
   const leafKey = String(d.acceptedUsageKey || d.usageKey);
   if (d.status === "ACCEPTED" && leafKey !== lineage[lineage.length - 1].key) {
-    lineage.push({ key: leafKey, name: d.canonicalName || d.scientificName, rank: d.rank.toLowerCase(), name_de: null });
+    lineage.push({ key: leafKey, name: d.canonicalName || d.scientificName, rank: d.rank.toLowerCase(), name_de: null, name_en: null });
   }
   return { lineage, match_type: d.matchType, confidence: d.confidence, rank: (d.rank || "").toLowerCase() };
 }

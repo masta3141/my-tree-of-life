@@ -4,8 +4,15 @@ import * as gbif from "./gbif.js";
 import * as gemini from "./gemini.js";
 import * as images from "./images.js";
 import { buildTree } from "./tree.js";
+import { t as tr, lang, labelOf, taxonInfo } from "./i18n.js";
 
-const DOMAIN_DE = { Eukaryota: "Eukaryoten", Bacteria: "Bakterien", Archaea: "Archaeen", Viruses: "Viren" };
+const DOMAIN_NAMES = {
+  Eukaryota: { de: "Eukaryoten", en: "Eukaryotes" },
+  Bacteria: { de: "Bakterien", en: "Bacteria" },
+  Archaea: { de: "Archaeen", en: "Archaea" },
+  Viruses: { de: "Viren", en: "Viruses" },
+};
+const otherLang = () => (lang === "en" ? "de" : "en");
 
 // ---------- IndexedDB plumbing ----------
 
@@ -55,7 +62,7 @@ async function taxaMap() {
 function lineageOf(taxa, key) {
   const out = [];
   for (let t = taxa.get(key); t; t = t.parent_key ? taxa.get(t.parent_key) : null) {
-    out.unshift({ key: t.key, name: t.name, rank: t.rank, name_de: t.name_de ?? null });
+    out.unshift({ key: t.key, name: t.name, rank: t.rank, name_de: t.name_de ?? null, name_en: t.name_en ?? null });
   }
   return out;
 }
@@ -95,19 +102,21 @@ async function resolveLineage(name, fallback) {
   for (let i = fallback.length - 1; i >= 0; i--) {
     const anchor = await gbif.match(fallback[i].name);
     if (anchor && anchor.lineage[anchor.lineage.length - 1].name === fallback[i].name) {
-      const rest = fallback.slice(i + 1).map((r) => ({ key: `gem:${r.rank}:${r.name}`, name: r.name, rank: r.rank, name_de: null }));
+      const rest = fallback.slice(i + 1).map((r) => ({ key: `gem:${r.rank}:${r.name}`, name: r.name, rank: r.rank, name_de: null, name_en: null }));
       return { lineage: [...anchor.lineage, ...rest], source: "gemini", match_type: null };
     }
   }
-  throw new Error(`Keine Taxonomie für „${name}“ gefunden`);
+  throw new Error(tr("err.noTaxonomy", name));
 }
 
-async function proposal(name, commonDe, { lineage, source, match_type }, ident = null) {
+// names: { common_name_de, common_name_en }
+async function proposal(name, names, { lineage, source, match_type }, ident = null) {
   const leaf = lineage[lineage.length - 1];
   const orgs = await tx("organisms", "readonly", (s) => getAll(s.organisms));
   return {
     scientific_name: source === "gbif" ? leaf.name : name,
-    common_name_de: commonDe,
+    common_name_de: names.common_name_de || "",
+    common_name_en: names.common_name_en || "",
     rank: leaf.rank,
     lineage,
     source,
@@ -116,46 +125,55 @@ async function proposal(name, commonDe, { lineage, source, match_type }, ident =
     reasoning: ident?.reasoning ?? null,
     alternatives: ident?.alternatives ?? [],
     gemini: ident,
-    duplicates: orgs.filter((o) => o.taxon_key === leaf.key).map((o) => ({ id: o.id, label: o.label_de })),
+    duplicates: orgs.filter((o) => o.taxon_key === leaf.key).map((o) => ({ id: o.id, label: labelOf(o) })),
   };
 }
 
 export async function identify(text, imageBlob, onStep = () => {}) {
-  if (!text && !imageBlob) throw new Error("Text oder Bild angeben");
+  if (!text && !imageBlob) throw new Error(tr("needInput"));
   onStep("gemini");
   const ident = await gemini.identify(text || null, imageBlob || null);
   onStep("gbif");
   const resolved = await resolveLineage(ident.scientific_name, ident.fallback_lineage || []);
-  return proposal(ident.scientific_name, ident.common_name_de, resolved, ident);
+  return proposal(ident.scientific_name, ident, resolved, ident);
 }
 
 // GBIF-only lookup, used when picking an alternative or correcting the name
-export async function lookup(name, commonDe = "") {
+export async function lookup(name, names = {}) {
   const resolved = await resolveLineage(name, []);
-  return proposal(name, commonDe || resolved.lineage[resolved.lineage.length - 1].name, resolved);
+  const sci = resolved.lineage[resolved.lineage.length - 1].name;
+  return proposal(name, { common_name_de: names.common_name_de || sci, common_name_en: names.common_name_en || sci }, resolved);
 }
 
 // ---------- organisms ----------
 
 export async function createOrganism({ proposal: p, inputText, label, imageBlob }) {
   const lineage = p.lineage.map((t) => ({ ...t }));
-  label = (label || "").trim() || p.common_name_de || lineage[lineage.length - 1].name;
+  // label in both languages: Gemini's common names, unless the user typed their own one
+  // (then the other language stays empty until "translate collection" fills it in)
+  const labels = { de: p.common_name_de || null, en: p.common_name_en || null };
+  label = (label || "").trim();
+  if (label && label !== labels[lang]) { labels[lang] = label; labels[otherLang()] = null; }
+  labels[lang] ||= lineage[lineage.length - 1].name;
 
-  // German names for taxa that are new or still lack one
+  // common names for taxa that are new or still lack one ("" = looked up, there is none)
   const known = await taxaMap();
-  const missing = lineage.filter((t) => !t.key.startsWith("dom:") && !known.get(t.key)?.name_de);
-  let names = {};
-  try { names = await gemini.germanNames(missing.map((t) => [t.rank, t.name])); }
-  catch (e) { console.warn("German names lookup failed", e); }
+  const missing = lineage.filter((t) => !t.key.startsWith("dom:") && (known.get(t.key)?.name_de == null || known.get(t.key)?.name_en == null));
+  let names = null;
+  try { names = await gemini.commonNames(missing.map((t) => [t.rank, t.name])); }
+  catch (e) { console.warn("Common names lookup failed", e); }
+  const nameFor = (t, l) => t.key.startsWith("dom:") ? DOMAIN_NAMES[t.name]?.[l] ?? null
+    : names ? names[t.name]?.[l] ?? "" : null;
 
   return tx(["taxa", "organisms", "images"], "readwrite", async (s) => {
     let parent = null;
     for (const t of lineage) {
       const old = await req(s.taxa.get(t.key));
-      const name_de = old?.name_de || (t.key.startsWith("dom:") ? DOMAIN_DE[t.name] : names[t.name]) || null;
       s.taxa.put({
-        description: null, features: null, ...old,
-        key: t.key, name: t.name, rank: t.rank, parent_key: parent, name_de,
+        description: null, features: null, description_en: null, features_en: null, ...old,
+        key: t.key, name: t.name, rank: t.rank, parent_key: parent,
+        name_de: old?.name_de || nameFor(t, "de") || (old?.name_de ?? null),
+        name_en: old?.name_en || nameFor(t, "en") || (old?.name_en ?? null),
         source: t.key.startsWith("dom:") ? "domain" : old?.source || p.source,
       });
       parent = t.key;
@@ -163,7 +181,8 @@ export async function createOrganism({ proposal: p, inputText, label, imageBlob 
     const id = await req(s.organisms.add({
       input_text: inputText || null,
       taxon_key: lineage[lineage.length - 1].key,
-      label_de: label,
+      label_de: labels.de,
+      label_en: labels.en,
       notes: null,
       gemini: p.gemini || null,
       created_at: new Date().toISOString(),
@@ -192,7 +211,7 @@ export async function listOrganisms() {
     .map((o) => {
       const t = taxa.get(o.taxon_key);
       return {
-        id: o.id, label: o.label_de, scientific_name: t?.name, rank: t?.rank,
+        id: o.id, label: labelOf(o), scientific_name: t?.name, rank: t?.rank,
         image: imageUrl(coverOf(byOrg.get(o.id) || [])), created_at: o.created_at,
         lineage: lineageOf(taxa, o.taxon_key),
       };
@@ -205,11 +224,11 @@ export async function getOrganism(id) {
     tx("images", "readonly", (s) => req(s.images.index("organism_id").getAll(id))),
     taxaMap(),
   ]);
-  if (!o) throw new Error("Nicht gefunden");
+  if (!o) throw new Error(tr("err.notFound"));
   const t = taxa.get(o.taxon_key);
   imgs.sort((a, b) => b.is_cover - a.is_cover || a.id - b.id);
   return {
-    id: o.id, label: o.label_de, scientific_name: t?.name, rank: t?.rank, taxon_key: o.taxon_key,
+    id: o.id, label: labelOf(o), scientific_name: t?.name, rank: t?.rank, taxon_key: o.taxon_key,
     image: imageUrl(coverOf(imgs)), images: imgs.map(imageOut),
     input_text: o.input_text, notes: o.notes, created_at: o.created_at, gemini: o.gemini,
     lineage: lineageOf(taxa, o.taxon_key),
@@ -220,7 +239,7 @@ export async function updateOrganism(id, patch) {
   await tx("organisms", "readwrite", async (s) => {
     const o = await req(s.organisms.get(id));
     if (!o) return;
-    if ("label" in patch) o.label_de = patch.label;
+    if ("label" in patch) o[lang === "en" ? "label_en" : "label_de"] = patch.label;
     if ("notes" in patch) o.notes = patch.notes;
     s.organisms.put(o);
   });
@@ -301,21 +320,46 @@ export async function addRemoteImage(organismId, c) {
 
 // ---------- taxa & tree ----------
 
-// Taxon details; the description is generated by Gemini on first request and cached.
+// German description keeps the old field names (description, features), English sits next to it
+const withInfo = (t, l, d) => l === "en"
+  ? { ...t, description_en: d.description, features_en: d.features }
+  : { ...t, description: d.description, features: d.features };
+
+// Taxon details; the description is generated by Gemini on first request (in both languages) and cached.
+// If only the other language is there, it is translated.
 export async function getTaxon(key) {
   let taxa = await taxaMap();
   let t = taxa.get(key);
-  if (!t) throw new Error("Nicht gefunden");
-  if (t.description == null) {
-    const info = await gemini.describeTaxon(t.rank, t.name, lineageOf(taxa, key).map((x) => x.name));
-    t = { ...t, name_de: t.name_de || info.name_de || null, description: info.description, features: info.features };
-    await tx("taxa", "readwrite", (s) => { s.taxa.put(t); });
+  if (!t) throw new Error(tr("err.notFound"));
+  if (taxonInfo(t).description == null) {
+    const other = otherLang();
+    const there = other === "en"
+      ? { description: t.description_en, features: t.features_en } : { description: t.description, features: t.features };
+    if (there.description) {
+      const [d] = await gemini.translateDescriptions([{ name: t.name, ...there }], other, lang);
+      t = withInfo(t, lang, { description: d.description, features: d.features || [] });
+    } else {
+      const info = await gemini.describeTaxon(t.rank, t.name, lineageOf(taxa, key).map((x) => x.name));
+      t = withInfo(withInfo(t, "de", { description: info.description_de, features: info.features_de }),
+        "en", { description: info.description_en, features: info.features_en });
+      t.name_de ||= info.name_de || t.name_de || null;
+      t.name_en ||= info.name_en || t.name_en || null;
+    }
+    const fresh = t;
+    await tx("taxa", "readwrite", async (s) => {
+      // write only the generated fields, the taxon may have changed meanwhile
+      const cur = await req(s.taxa.get(key));
+      if (cur) s.taxa.put({ ...cur, name_de: cur.name_de || fresh.name_de, name_en: cur.name_en || fresh.name_en,
+        description: cur.description ?? fresh.description ?? null, features: cur.features ?? fresh.features ?? null,
+        description_en: cur.description_en ?? fresh.description_en ?? null, features_en: cur.features_en ?? fresh.features_en ?? null });
+    });
     taxa.set(key, t);
   }
   const orgs = await listOrganisms();
+  const info = taxonInfo(t);
   return {
-    key: t.key, name: t.name, rank: t.rank, name_de: t.name_de, description: t.description,
-    features: t.features || [], source: t.source,
+    key: t.key, name: t.name, rank: t.rank, name_de: t.name_de, name_en: t.name_en ?? null,
+    description: info.description, features: info.features || [], source: t.source,
     lineage: lineageOf(taxa, key).slice(0, -1),
     organisms: orgs.filter((o) => o.lineage.some((x) => x.key === key)).map((o) => ({ id: o.id, label: o.label, image: o.image })),
   };
@@ -348,24 +392,65 @@ const base64ToBlob = (b64, mime) => {
   return new Blob([bytes], { type: mime });
 };
 
-// Merge an export into the current collection (taxa are shared, organisms/images are added).
+// fill an empty value from another source; "" (= known to be empty) loses against a real value, wins against null
+const fill = (a, b) => a || b || (a ?? b ?? null);
+
+// the same organism in another copy of the collection: same creation time and taxon, else same taxon and label
+function findSame(existing, o) {
+  return existing.find((e) => e.created_at === o.created_at && e.taxon_key === o.taxon_key)
+    || existing.find((e) => e.taxon_key === o.taxon_key && e.label_de && e.label_de === o.label_de);
+}
+
+// copy missing labels and Gemini texts (e.g. translations) from an imported organism onto a stored one
+function mergeOrganism(old, o) {
+  const g = old.gemini, h = o.gemini;
+  return {
+    ...old,
+    label_de: fill(old.label_de, o.label_de),
+    label_en: fill(old.label_en, o.label_en),
+    notes: old.notes || o.notes || null,
+    gemini: g && h ? {
+      ...g,
+      reasoning: fill(g.reasoning, h.reasoning),
+      reasoning_en: fill(g.reasoning_en, h.reasoning_en),
+      common_name_en: fill(g.common_name_en, h.common_name_en),
+      alternatives: (g.alternatives || []).map((a) => {
+        const b = (h.alternatives || []).find((x) => x.scientific_name === a.scientific_name) || {};
+        return { ...a, common_name_de: fill(a.common_name_de, b.common_name_de), common_name_en: fill(a.common_name_en, b.common_name_en) };
+      }),
+    } : g || h || null,
+  };
+}
+
+// Merge an export into the current collection: taxa are shared, organisms already there get missing
+// fields filled in, new organisms are added with their images.
+// A translations file (kind: "translations") only fills in fields of taxa and organisms that already exist.
 export async function importData(data) {
-  if (data?.format !== FORMAT) throw new Error("Keine My-Tree-of-Life-Exportdatei");
+  if (data?.format !== FORMAT) throw new Error(tr("err.notExport"));
+  const onlyUpdate = data.kind === "translations";
   const imgBlobs = (data.images || []).map((i) => base64ToBlob(i.data, i.mime));
   return tx(["taxa", "organisms", "images"], "readwrite", async (s) => {
     for (const t of data.taxa || []) {
       const old = await req(s.taxa.get(t.key));
+      if (!old && onlyUpdate) continue;
       s.taxa.put(old ? {
         ...old,
-        name_de: old.name_de || t.name_de || null,
+        name_de: fill(old.name_de, t.name_de),
+        name_en: fill(old.name_en, t.name_en),
         description: old.description ?? t.description ?? null,
         features: old.features ?? t.features ?? null,
+        description_en: old.description_en ?? t.description_en ?? null,
+        features_en: old.features_en ?? t.features_en ?? null,
       } : t);
     }
+    const existing = await getAll(s.organisms);
     const idMap = new Map();
+    let updated = 0;
     for (const o of data.organisms || []) {
       const { id, ...rest } = o;
-      idMap.set(id, await req(s.organisms.add(rest)));
+      const same = findSame(existing, rest);
+      if (same) { s.organisms.put(mergeOrganism(same, rest)); updated++; }
+      else if (!onlyUpdate) idMap.set(id, await req(s.organisms.add(rest)));
     }
     let n = 0;
     for (const [k, i] of (data.images || []).entries()) {
@@ -375,6 +460,88 @@ export async function importData(data) {
       s.images.add({ ...meta, organism_id: oid, blob: imgBlobs[k] });
       n++;
     }
-    return { organisms: idMap.size, images: n, taxa: (data.taxa || []).length };
+    return { organisms: idMap.size, images: n, updated, taxa: (data.taxa || []).length };
   });
 }
+
+// ---------- translation ----------
+
+const chunks = (a, n) => Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i * n, i * n + n));
+
+// Fill in missing names, labels and (optionally) descriptions in both languages with Gemini.
+// onStep(text) reports progress.
+export async function translateCollection({ descriptions = true, onStep = () => {} } = {}) {
+  let names = 0, texts = 0;
+  const patchTaxa = (patches) => tx("taxa", "readwrite", async (s) => {
+    for (const [key, p] of patches) {
+      const cur = await req(s.taxa.get(key));
+      if (cur) s.taxa.put({ ...cur, ...p(cur) });
+    }
+  });
+
+  // common names of taxa
+  const taxa = [...(await taxaMap()).values()];
+  const noName = taxa.filter((t) => t.name_de == null || t.name_en == null);
+  for (const batch of chunks(noName.filter((t) => !t.key.startsWith("dom:")), 40)) {
+    onStep(tr("translating", tr("tr.names")));
+    const got = await gemini.commonNames(batch.map((t) => [t.rank, t.name]));
+    await patchTaxa(batch.map((t) => [t.key, (cur) => ({
+      name_de: fill(cur.name_de, got[t.name]?.de ?? ""), name_en: fill(cur.name_en, got[t.name]?.en ?? ""),
+    })]));
+    names += batch.length;
+  }
+  await patchTaxa(noName.filter((t) => t.key.startsWith("dom:")).map((t) => [t.key, (cur) => ({
+    name_de: fill(cur.name_de, DOMAIN_NAMES[t.name]?.de), name_en: fill(cur.name_en, DOMAIN_NAMES[t.name]?.en),
+  })]));
+
+  // descriptions that exist in one language only
+  if (descriptions) {
+    for (const [from, to] of [["de", "en"], ["en", "de"]]) {
+      const src = (t) => (from === "en" ? { description: t.description_en, features: t.features_en } : { description: t.description, features: t.features });
+      const todo = taxa.filter((t) => src(t).description && taxonInfoIn(t, to).description == null);
+      for (const batch of chunks(todo, 6)) {
+        onStep(tr("translating", tr("tr.descriptions", `${texts + 1}–${texts + batch.length}`)));
+        const got = await gemini.translateDescriptions(batch.map((t) => ({ name: t.name, ...src(t) })), from, to);
+        await patchTaxa(batch.map((t) => [t.key, (cur) => {
+          const d = got.find((x) => x.name === t.name);
+          return d && taxonInfoIn(cur, to).description == null ? withInfo({}, to, { description: d.description, features: d.features || [] }) : {};
+        }]));
+        texts += batch.length;
+      }
+    }
+  }
+
+  // organism labels, Gemini's reasoning and alternative names
+  const orgs = await tx("organisms", "readonly", (s) => getAll(s.organisms));
+  for (const [from, to] of [["de", "en"], ["en", "de"]]) {
+    const label = (o, l) => o[`label_${l}`];
+    const reason = (g, l) => (l === "de" ? g?.reasoning : g?.reasoning_en);
+    const todo = orgs.filter((o) => label(o, from) && (!label(o, to) || (reason(o.gemini, from) && !reason(o.gemini, to))));
+    for (const batch of chunks(todo, 20)) {
+      onStep(tr("translating", tr("tr.labels")));
+      const sci = await taxaMap();
+      const got = await gemini.translateOrganisms(batch.map((o) => ({
+        id: o.id, scientific_name: sci.get(o.taxon_key)?.name || "", label: label(o, from),
+        reasoning: reason(o.gemini, from) || "",
+        alternatives: (o.gemini?.alternatives || []).map((a) => a[`common_name_${from}`] || ""),
+      })), from, to);
+      await tx("organisms", "readwrite", async (s) => {
+        for (const r of got) {
+          const cur = await req(s.organisms.get(r.id));
+          if (!cur) continue;
+          cur[`label_${to}`] ||= r.label || null;
+          if (cur.gemini) {
+            const key = to === "de" ? "reasoning" : "reasoning_en";
+            cur.gemini[key] ||= r.reasoning || null;
+            (cur.gemini.alternatives || []).forEach((a, i) => { a[`common_name_${to}`] ||= r.alternatives?.[i] || ""; });
+          }
+          s.organisms.put(cur);
+          names++;
+        }
+      });
+    }
+  }
+  return { names, descriptions: texts };
+}
+
+const taxonInfoIn = (t, l) => (l === "en" ? { description: t.description_en ?? null } : { description: t.description ?? null });
