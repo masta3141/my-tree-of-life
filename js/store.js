@@ -120,9 +120,11 @@ async function proposal(name, commonDe, { lineage, source, match_type }, ident =
   };
 }
 
-export async function identify(text, imageBlob) {
+export async function identify(text, imageBlob, onStep = () => {}) {
   if (!text && !imageBlob) throw new Error("Text oder Bild angeben");
+  onStep("gemini");
   const ident = await gemini.identify(text || null, imageBlob || null);
+  onStep("gbif");
   const resolved = await resolveLineage(ident.scientific_name, ident.fallback_lineage || []);
   return proposal(ident.scientific_name, ident.common_name_de, resolved, ident);
 }

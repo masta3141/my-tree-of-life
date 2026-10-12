@@ -39,6 +39,12 @@
     padding: 6px 4px; max-height: 120px; }
   .composer .icon-btn { cursor: pointer; padding: 6px; line-height: 1; }
   .composer .primary { padding: 6px 12px; }
+  .composer.busy { border-color: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); } }
+  .spinner { display: inline-block; width: 1em; height: 1em; border: 2px solid currentColor; border-right-color: transparent;
+    border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -.15em; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: var(--accent); font-size: 13px; }
   .thumb { position: relative; flex: none; align-self: center; }
   .thumb img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; display: block; }
   .thumb button { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; padding: 0; border-radius: 50%;
@@ -195,6 +201,7 @@
       <label class="icon-btn" title="Bild hinzufügen">📷<input type="file" id="file" accept="image/*" hidden></label>
       <button class="primary" id="btnIdentify" title="Bestimmen">➜</button>
     </div>
+    <div class="status" id="status" hidden><span class="spinner"></span><span id="statusText"></span></div>
     <div id="error" class="err"></div>
     <div id="proposal"></div>
 
@@ -213,6 +220,12 @@
     <div id="detail" hidden></div>
   </main>
 </div>
-<script type="module" src="js/app.js"></script>
+<script>
+  // Show startup/runtime errors on the page, e.g. on phones without a console
+  const showErr = (m) => { const el = document.getElementById("error"); if (el) el.textContent = "Fehler: " + m; };
+  addEventListener("error", (e) => showErr(e.message));
+  addEventListener("unhandledrejection", (e) => showErr(e.reason?.message || e.reason));
+</script>
+<script type="module" src="js/app.js?v=3"></script>
 </body>
 </html>

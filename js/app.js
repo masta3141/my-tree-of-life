@@ -9,7 +9,23 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 
 function busy(btn, on, label) {
   btn.disabled = on;
-  if (label) btn.textContent = on ? "…" : label;
+  if (label) btn.innerHTML = on ? '<span class="spinner"></span>' : esc(label);
+}
+
+// progress line under the input, with elapsed seconds for slow requests
+let statusTimer = null;
+function status(text) {
+  clearInterval(statusTimer);
+  $("status").hidden = !text;
+  $("drop").classList.toggle("busy", !!text);
+  if (!text) return;
+  const t0 = Date.now();
+  const tick = () => {
+    const sec = Math.floor((Date.now() - t0) / 1000);
+    $("statusText").textContent = sec >= 2 ? `${text} ${sec} s` : text;
+  };
+  tick();
+  statusTimer = setInterval(tick, 1000);
 }
 
 // ---------- settings ----------
@@ -62,14 +78,16 @@ async function identify() {
   const text = $("text").value.trim();
   if (!text && !imageFile) { $("error").textContent = "Text oder Bild angeben."; return; }
   busy($("btnIdentify"), true, "➜");
-  try { showProposal(await store.identify(text, imageFile)); }
+  const steps = { gemini: "Gemini bestimmt den Organismus …", gbif: "Stammbaum bei GBIF nachschlagen …" };
+  try { showProposal(await store.identify(text, imageFile, (k) => status(steps[k]))); }
   catch (e) { $("error").textContent = e.message; }
-  finally { busy($("btnIdentify"), false, "➜"); }
+  finally { busy($("btnIdentify"), false, "➜"); status(null); }
 }
 $("btnIdentify").onclick = identify;
 
 async function lookup(name, de) {
   $("error").textContent = "";
+  status("Stammbaum bei GBIF nachschlagen …");
   try {
     const p = await store.lookup(name, de);
     p.gemini = current?.gemini; // keep original identification for the record
@@ -77,6 +95,7 @@ async function lookup(name, de) {
     p.reasoning = current?.reasoning;
     showProposal(p);
   } catch (e) { $("error").textContent = e.message; }
+  finally { status(null); }
 }
 
 function showProposal(p) {
@@ -110,6 +129,7 @@ function showProposal(p) {
 
 async function save() {
   busy($("btnSave"), true, "Speichern");
+  status("Speichern, deutsche Namen von Gemini holen …");
   try {
     await store.createOrganism({
       proposal: current, inputText: $("text").value.trim(), label: $("label").value.trim(), imageBlob: imageFile,
@@ -119,6 +139,7 @@ async function save() {
     store.requestPersistence();
     await refresh();
   } catch (e) { $("error").textContent = e.message; busy($("btnSave"), false, "Speichern"); }
+  finally { status(null); }
 }
 
 // ---------- list ----------
