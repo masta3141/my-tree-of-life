@@ -1,4 +1,4 @@
-# 🌳 Tree of Life
+# 🌳 My Tree of Life
 
 Ein persönlicher Stammbaum des Lebens – nur mit den Organismen, die **dich** interessieren.
 

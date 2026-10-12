@@ -12,7 +12,7 @@ const DOMAIN_DE = { Eukaryota: "Eukaryoten", Bacteria: "Bakterien", Archaea: "Ar
 let dbPromise;
 function db() {
   dbPromise ??= new Promise((resolve, reject) => {
-    const r = indexedDB.open("tree-of-life", 1);
+    const r = indexedDB.open("tree-of-life", 1); // keep name, renaming would orphan stored data
     r.onupgradeneeded = () => {
       const d = r.result;
       d.createObjectStore("taxa", { keyPath: "key" });
@@ -328,7 +328,7 @@ export async function getTree() {
 
 // ---------- export / import ----------
 
-const FORMAT = "tree-of-life";
+const FORMAT = "tree-of-life"; // internal id, kept so older exports still import
 
 export async function exportData() {
   const [taxa, organisms, imgs] = await tx(["taxa", "organisms", "images"], "readonly", (s) =>
@@ -350,7 +350,7 @@ const base64ToBlob = (b64, mime) => {
 
 // Merge an export into the current collection (taxa are shared, organisms/images are added).
 export async function importData(data) {
-  if (data?.format !== FORMAT) throw new Error("Keine Tree-of-Life-Exportdatei");
+  if (data?.format !== FORMAT) throw new Error("Keine My-Tree-of-Life-Exportdatei");
   const imgBlobs = (data.images || []).map((i) => base64ToBlob(i.data, i.mime));
   return tx(["taxa", "organisms", "images"], "readwrite", async (s) => {
     for (const t of data.taxa || []) {

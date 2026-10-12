@@ -2,7 +2,7 @@
 data/
 bsp/
 *.sqlite
-tree-of-life-*.json
+*tree-of-life-*.json
 meine-sammlung*.json
 
 # secrets / local tooling

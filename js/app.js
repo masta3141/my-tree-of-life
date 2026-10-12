@@ -360,7 +360,7 @@ $("btnExport").onclick = async () => {
     const blob = await store.exportData();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `tree-of-life-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `my-tree-of-life-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
     $("ioState").textContent = `exportiert (${(blob.size / 1e6).toFixed(1)} MB)`;
