@@ -28,7 +28,7 @@
   main { position: relative; overflow: hidden; }
   h1 { font-size: 18px; margin: 0 0 16px; letter-spacing: .01em; }
   h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 24px 0 8px; }
-  textarea, input[type=text] { width: 100%; font: inherit; color: inherit; background: var(--bg);
+  textarea, input[type=text], input[type=password] { width: 100%; font: inherit; color: inherit; background: var(--bg);
     border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
   textarea { resize: vertical; min-height: 56px; }
   .drop { display: block; margin-top: 8px; border: 1.5px dashed var(--line); border-radius: 8px; padding: 12px;
@@ -125,9 +125,10 @@
   .settings input { background: var(--panel); }
   .notice { border: 1px solid var(--warn); color: var(--fg); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; font-size: 13px; }
   .notice a, .settings a { color: var(--accent); }
-  .foot { margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--line); }
-  .foot .row { margin-top: 6px; }
-  .foot button { font-size: 12px; padding: 5px 10px; }
+  .settings label + .small { margin-bottom: 2px; }
+  /* no text selection on tappable things – otherwise Chrome's "Touch to Search" pops up on phones */
+  svg, .chip, .clickable, summary, button, .fold, .rank-head-g { -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
   details > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 6px; }
   details > summary::-webkit-details-marker { display: none; }
   details > summary::before { content: "▸"; color: var(--muted); font-size: 12px; margin-top: 16px; transition: transform .15s; }
@@ -167,6 +168,13 @@
       <p class="small muted">Key und Sammlung bleiben in diesem Browser. Der Key wird nur an Google gesendet.
         <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Key erstellen</a></p>
       <div class="row"><button class="primary" id="btnSaveSettings">Speichern</button><button id="btnCloseSettings">Schließen</button></div>
+      <label style="margin-top:18px">Sammlung sichern</label>
+      <div class="small muted">Deine Sammlung liegt nur in diesem Browser. Sichere sie ab und zu.</div>
+      <div class="row">
+        <button id="btnExport">⬇ Exportieren</button>
+        <button id="btnImport">⬆ Importieren</button><input type="file" id="importFile" accept="application/json,.json" hidden>
+      </div>
+      <div class="small muted" id="ioState"></div>
     </div>
 
     <textarea id="text" placeholder="Organismus, z.B. „Eichhörnchen“, „Kreuzspinne“, „die Kastanie vor dem Haus“"></textarea>
@@ -183,14 +191,6 @@
       <ul class="list" id="list"></ul>
     </details>
 
-    <div class="foot">
-      <div class="small muted">Deine Sammlung liegt nur in diesem Browser. Sichere sie ab und zu.</div>
-      <div class="row">
-        <button id="btnExport">⬇ Exportieren</button>
-        <label><button id="btnImport">⬆ Importieren</button><input type="file" id="importFile" accept="application/json,.json" hidden></label>
-      </div>
-      <div class="small muted" id="ioState"></div>
-    </div>
   </aside>
   <main>
     <svg id="svg"></svg>
