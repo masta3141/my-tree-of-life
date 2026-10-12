@@ -31,17 +31,13 @@ $("btnSaveSettings").onclick = () => {
 
 // ---------- input ----------
 const drop = $("drop");
-const isTouch = matchMedia("(pointer: coarse)").matches;
 function setImage(f) {
   imageFile = f;
-  if (!f) {
-    $("dropText").textContent = isTouch ? "📷 Über Bild bestimmen (optional)" : "Bild hierher ziehen oder klicken (optional)";
-    return;
-  }
-  const url = URL.createObjectURL(f);
-  $("dropText").innerHTML = `<img src="${url}" alt=""><span class="small muted">${esc(f.name)} · ${isTouch ? "tippen" : "klicken"} zum Ändern</span>`;
+  $("thumb").hidden = !f;
+  if (f) $("thumbImg").src = URL.createObjectURL(f);
+  else $("file").value = "";
 }
-setImage(null);
+$("btnClearImg").onclick = () => setImage(null);
 $("file").addEventListener("change", (e) => setImage(e.target.files[0] || null));
 drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
 drop.addEventListener("dragleave", () => drop.classList.remove("over"));
@@ -54,18 +50,21 @@ document.addEventListener("paste", (e) => {
   const f = [...(e.clipboardData?.files || [])].find((f) => f.type.startsWith("image/"));
   if (f) setImage(f);
 });
+const autoGrow = () => { const t = $("text"); t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; };
+$("text").addEventListener("input", autoGrow);
 $("text").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) identify();
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); identify(); }
 });
 
 async function identify() {
+  if ($("btnIdentify").disabled) return;
   $("error").textContent = "";
   const text = $("text").value.trim();
   if (!text && !imageFile) { $("error").textContent = "Text oder Bild angeben."; return; }
-  busy($("btnIdentify"), true, "Bestimmen");
+  busy($("btnIdentify"), true, "➜");
   try { showProposal(await store.identify(text, imageFile)); }
   catch (e) { $("error").textContent = e.message; }
-  finally { busy($("btnIdentify"), false, "Bestimmen"); }
+  finally { busy($("btnIdentify"), false, "➜"); }
 }
 $("btnIdentify").onclick = identify;
 
@@ -116,7 +115,7 @@ async function save() {
       proposal: current, inputText: $("text").value.trim(), label: $("label").value.trim(), imageBlob: imageFile,
     });
     $("proposal").innerHTML = ""; current = null;
-    $("text").value = ""; setImage(null); $("file").value = "";
+    $("text").value = ""; autoGrow(); setImage(null);
     store.requestPersistence();
     await refresh();
   } catch (e) { $("error").textContent = e.message; busy($("btnSave"), false, "Speichern"); }

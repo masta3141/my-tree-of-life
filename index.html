@@ -31,10 +31,18 @@
   textarea, input[type=text], input[type=password] { width: 100%; font: inherit; color: inherit; background: var(--bg);
     border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
   textarea { resize: vertical; min-height: 56px; }
-  .drop { display: block; margin-top: 8px; border: 1.5px dashed var(--line); border-radius: 8px; padding: 12px;
-    text-align: center; color: var(--muted); cursor: pointer; }
-  .drop.over { border-color: var(--accent); color: var(--accent); }
-  .drop img { max-width: 100%; max-height: 160px; border-radius: 6px; display: block; margin: 0 auto; }
+  .composer { display: flex; align-items: flex-end; gap: 4px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--bg); padding: 4px; }
+  .composer.over { border-color: var(--accent); border-style: dashed; }
+  .composer:focus-within { border-color: var(--accent); }
+  .composer textarea { flex: 1; min-width: 0; min-height: 0; border: none; background: none; outline: none; resize: none;
+    padding: 6px 4px; max-height: 120px; }
+  .composer .icon-btn { cursor: pointer; padding: 6px; line-height: 1; }
+  .composer .primary { padding: 6px 12px; }
+  .thumb { position: relative; flex: none; align-self: center; }
+  .thumb img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; display: block; }
+  .thumb button { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; padding: 0; border-radius: 50%;
+    font-size: 11px; line-height: 16px; background: var(--fg); color: var(--bg); border: none; }
   button { font: inherit; border: 1px solid var(--line); background: var(--bg); color: var(--fg);
     border-radius: 8px; padding: 7px 12px; cursor: pointer; }
   button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
@@ -144,7 +152,10 @@
   main.fs #detail { left: auto; right: 12px; top: 12px; width: min(380px, calc(100% - 24px)); }
   @media (max-width: 760px) {
     .app { grid-template-columns: 1fr; grid-template-rows: auto 70vh; height: auto; }
-    aside { border-right: none; border-bottom: 1px solid var(--line); }
+    aside { border-right: none; border-bottom: 1px solid var(--line); padding: 12px; }
+    .head { margin-bottom: 10px; }
+    details > summary h2 { margin: 10px 0 4px; }
+    details > summary::before { margin-top: 6px; }
     #detail { left: 8px; right: 8px; top: 8px; width: auto; }
   }
 </style>
@@ -178,12 +189,12 @@
       <div class="small muted" id="ioState"></div>
     </div>
 
-    <textarea id="text" placeholder="Organismus, z.B. „Eichhörnchen“, „Kreuzspinne“, „die Kastanie vor dem Haus“"></textarea>
-    <label class="drop" id="drop">
-      <input type="file" id="file" accept="image/*" hidden>
-      <span id="dropText">Bild hierher ziehen oder klicken (optional)</span>
-    </label>
-    <div class="row"><button class="primary" id="btnIdentify">Bestimmen</button></div>
+    <div class="composer" id="drop">
+      <div class="thumb" id="thumb" hidden><img id="thumbImg" alt=""><button id="btnClearImg" title="Bild entfernen">✕</button></div>
+      <textarea id="text" rows="1" placeholder="Organismus, z.B. „Kreuzspinne“"></textarea>
+      <label class="icon-btn" title="Bild hinzufügen">📷<input type="file" id="file" accept="image/*" hidden></label>
+      <button class="primary" id="btnIdentify" title="Bestimmen">➜</button>
+    </div>
     <div id="error" class="err"></div>
     <div id="proposal"></div>
 
