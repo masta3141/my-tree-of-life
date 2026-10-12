@@ -99,10 +99,17 @@
   .clickable { cursor: pointer; }
   ul.list li.clickable:hover .t div:first-child { color: var(--accent); }
   .node-hit:hover circle { stroke: var(--fg); stroke-width: 2px; }
+  .fold { cursor: pointer; }
+  .fold-btn { fill: var(--panel); stroke: var(--node); stroke-width: 1.5px; }
+  .fold:hover .fold-btn { fill: var(--node); }
+  .fold-sign { font-size: 13px; font-weight: 700; fill: var(--node); pointer-events: none; }
+  .fold:hover .fold-sign { fill: var(--accent-fg); }
   .link { fill: none; stroke: var(--link); stroke-width: 1.5px; }
   .link-hit { fill: none; stroke: transparent; stroke-width: 12px; }
   .skip { font-size: 10px; fill: var(--muted); }
   .rank-head { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; fill: var(--muted); }
+  .rank-head-g { cursor: pointer; }
+  .rank-head-g:hover .rank-head, .rank-head-g.active .rank-head { fill: var(--accent); font-weight: 700; }
   .n-name { font-size: 13px; font-weight: 600; fill: var(--fg); }
   .n-sub { font-size: 11px; fill: var(--muted); }
   .n-sci { font-size: 11px; font-style: italic; fill: var(--muted); }

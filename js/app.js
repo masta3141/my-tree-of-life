@@ -365,6 +365,50 @@ const tip = $("tip");
 let firstRender = true;
 let fitTree = () => {};
 
+// folded (eingeklappte) taxon keys, remembered per browser
+const FOLD_KEY = "tol.folded";
+const folded = new Set((() => { try { return JSON.parse(localStorage.getItem(FOLD_KEY)) || []; } catch { return []; } })());
+let foldLevel = (() => { try { return JSON.parse(localStorage.getItem(FOLD_KEY + "Level")); } catch { return null; } })();
+const saveFolded = () => {
+  try {
+    localStorage.setItem(FOLD_KEY, JSON.stringify([...folded]));
+    localStorage.setItem(FOLD_KEY + "Level", JSON.stringify(foldLevel));
+  } catch {}
+};
+const countOrgs = (n) => n.type === "organism" ? 1 : n.children.reduce((s, c) => s + countOrgs(c), 0);
+let lastRoot = null, lastData = null;
+
+function toggleFold(key) {
+  // keep the toggled node at the same spot on screen
+  const before = lastRoot?.descendants().find((d) => d.data.taxon.key === key);
+  folded.has(key) ? folded.delete(key) : folded.add(key);
+  foldLevel = null;
+  saveFolded();
+  refreshTree().then(() => {
+    const after = lastRoot?.descendants().find((d) => d.data.taxon.key === key);
+    if (before && after) svg.call(zoom.translateBy, before.y - after.y, before.x - after.x);
+  });
+}
+
+// Column header click: show everything up to this rank (replaces all single folds); same header again unfolds all.
+function foldToRank(r) {
+  folded.clear();
+  if (r == null || foldLevel === r) foldLevel = null;
+  else {
+    foldLevel = r;
+    d3.hierarchy(lastData).each((d) => {
+      if (d.data.type !== "taxon" || d.data.taxon.key === "life" || !d.children) return;
+      const rc = rankOf(d);
+      // fold the nodes of this column, and earlier nodes whose children all lie beyond it
+      if (rc === r || (rc < r && d.children.every((c) => c.data.type === "organism" || rankOf(c) > r)))
+        folded.add(d.data.taxon.key);
+    });
+  }
+  saveFolded();
+  hideTip();
+  refreshTree().then(() => fitTree());
+}
+
 function showTip(evt, html) {
   tip.innerHTML = html; tip.style.display = "block";
   const box = document.querySelector("main").getBoundingClientRect();
@@ -379,12 +423,13 @@ const RANKS = ["domain", "kingdom", "subkingdom", "phylum", "subphylum", "class"
 const RANK_DE = { domain: "Domäne", kingdom: "Reich", phylum: "Stamm", class: "Klasse", order: "Ordnung",
   family: "Familie", genus: "Gattung", species: "Art" };
 
+const rankOf = (d) => {
+  const i = RANKS.indexOf(d.data.taxon.rank);
+  return i >= 0 ? i : (d.parent ? rankOf(d.parent) + 0.5 : 0); // unknown rank: just right of parent
+};
+
 // Horizontal position by taxonomic rank: all taxa of one rank share a column, organisms get the last one.
 function placeByRank(root, dy) {
-  const rankOf = (d) => {
-    const i = RANKS.indexOf(d.data.taxon.rank);
-    return i >= 0 ? i : (d.parent ? rankOf(d.parent) + 0.5 : 0); // unknown rank: just right of parent
-  };
   const isLife = (d) => d.data.taxon.key === "life";
   const inner = root.descendants().filter((d) => d.data.type === "taxon" && !isLife(d));
   const used = [...new Set(inner.map(rankOf))].sort((a, b) => a - b);
@@ -396,8 +441,8 @@ function placeByRank(root, dy) {
   });
   return [
     ...(isLife(root) ? [{ y: -dy, label: "" }] : []),
-    ...used.map((r, i) => ({ y: i * dy, label: RANK_DE[RANKS[r]] || RANKS[r] || "" })),
-    { y: used.length * dy, label: "Organismen" },
+    ...used.map((r, i) => ({ y: i * dy, r, label: RANK_DE[RANKS[r]] || RANKS[r] || "" })),
+    { y: used.length * dy, r: null, label: "Organismen" },
   ];
 }
 
@@ -406,17 +451,27 @@ async function refreshTree() {
   g.selectAll("*").remove();
   $("empty").hidden = !!data;
   if (!data) return;
+  lastData = data;
 
-  const root = d3.hierarchy(data);
+  const isFolded = (n) => n.type === "taxon" && folded.has(n.taxon.key);
+  const root = d3.hierarchy(data, (n) => (isFolded(n) ? null : n.children));
+  lastRoot = root;
   const dx = 56, dy = 200;
   d3.cluster().nodeSize([dx, dy]).separation((a, b) => (a.parent === b.parent ? 1 : 1.25))(root);
   const cols = placeByRank(root, dy);
 
   // column headers (rank names) above the tree
   const top = d3.min(root.descendants(), (d) => d.x) - 44;
-  g.append("g").selectAll("text").data(cols).join("text")
-    .attr("class", "rank-head").attr("x", (c) => c.y).attr("y", top).attr("text-anchor", "middle")
-    .text((c) => c.label);
+  // tap a header: fold everything up to this column; "Organismen" or the active header again: unfold all
+  const heads = g.append("g").selectAll("g").data(cols.filter((c) => c.label)).join("g")
+    .attr("class", (c) => "rank-head-g" + (c.r != null && c.r === foldLevel ? " active" : ""))
+    .attr("transform", (c) => `translate(${c.y},${top})`)
+    .on("click", (e, c) => { e.stopPropagation(); foldToRank(c.r); });
+  heads.append("title").text((c) => c.r == null ? "Alles ausklappen"
+    : c.r === foldLevel ? "Alles ausklappen" : `Bis ${c.label} einklappen`);
+  heads.append("rect").attr("x", -60).attr("y", -20).attr("width", 120).attr("height", 30).attr("fill", "transparent");
+  heads.append("text").attr("class", "rank-head").attr("text-anchor", "middle")
+    .text((c) => (c.r != null && c.r === foldLevel ? "▸ " : "") + c.label);
 
   const defs = g.append("defs");
   defs.append("clipPath").attr("id", "clip").append("circle").attr("r", 18);
@@ -455,6 +510,17 @@ async function refreshTree() {
     .text((d) => d.data.taxon.name_de || d.data.taxon.name);
   inner.append("text").attr("class", "n-sub halo").attr("x", -10).attr("y", 9).attr("text-anchor", "end")
     .text((d) => (d.data.taxon.name_de ? d.data.taxon.name + " · " : "") + d.data.taxon.rank);
+
+  // fold toggle (−/+) on every node that has children
+  const foldable = node.filter((d) => d.data.type === "taxon" && d.data.children.length);
+  const tog = foldable.append("g").attr("class", "fold").attr("transform", "translate(14,-14)")
+    .on("click", (e, d) => { e.stopPropagation(); hideTip(); toggleFold(d.data.taxon.key); });
+  tog.append("circle").attr("r", 16).attr("fill", "transparent"); // bigger touch target
+  tog.append("circle").attr("class", "fold-btn").attr("r", 8);
+  tog.append("text").attr("class", "fold-sign").attr("text-anchor", "middle").attr("y", 4)
+    .text((d) => (isFolded(d.data) ? "+" : "−"));
+  foldable.filter((d) => isFolded(d.data)).append("text").attr("class", "n-sub halo").attr("x", 12).attr("y", 4)
+    .text((d) => { const n = countOrgs(d.data); return `${n} ${n === 1 ? "Organismus" : "Organismen"}`; });
 
   // organisms
   const leaf = node.filter(isLeaf).attr("class", "clickable node-hit")
