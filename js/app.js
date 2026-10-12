@@ -519,11 +519,11 @@ async function refreshTree() {
 
   // fold toggle (−/+) on every node that has children
   const foldable = node.filter((d) => d.data.type === "taxon" && d.data.children.length);
-  const tog = foldable.append("g").attr("class", "fold").attr("transform", "translate(17,-17)")
+  const tog = foldable.append("g").attr("class", "fold").attr("transform", "translate(14,-14)")
     .on("click", (e, d) => { e.stopPropagation(); hideTip(); toggleFold(d.data.taxon.key); });
-  tog.append("circle").attr("r", 20).attr("fill", "transparent"); // bigger touch target
-  tog.append("circle").attr("class", "fold-btn").attr("r", 11);
-  tog.append("text").attr("class", "fold-sign").attr("text-anchor", "middle").attr("y", 5.5)
+  tog.append("circle").attr("r", 16).attr("fill", "transparent"); // bigger touch target
+  tog.append("circle").attr("class", "fold-btn").attr("r", 8);
+  tog.append("text").attr("class", "fold-sign").attr("text-anchor", "middle").attr("y", 4)
     .text((d) => (isFolded(d.data) ? "+" : "−"));
   foldable.filter((d) => isFolded(d.data)).append("text").attr("class", "n-sub halo").attr("x", 12).attr("y", 4)
     .text((d) => { const n = countOrgs(d.data); return `${n} ${n === 1 ? "Organismus" : "Organismen"}`; });
