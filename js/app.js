@@ -359,15 +359,7 @@ $("importFile").onchange = async (e) => {
 // ---------- tree ----------
 const svg = d3.select("#svg");
 const g = svg.append("g");
-// fold buttons keep a usable on-screen size when zoomed out (phones): grow them against the zoom
-const sizeFoldButtons = (k) => {
-  const s = Math.max(1, 12 / (11 * k)); // ≥ 12px radius on screen
-  g.selectAll(".fold").attr("transform", `translate(${13 * s},${-13 * s}) scale(${s})`);
-};
-const zoom = d3.zoom().scaleExtent([0.2, 3]).on("zoom", (e) => {
-  g.attr("transform", e.transform);
-  sizeFoldButtons(e.transform.k);
-});
+const zoom = d3.zoom().scaleExtent([0.2, 3]).on("zoom", (e) => g.attr("transform", e.transform));
 svg.call(zoom);
 const tip = $("tip");
 let firstRender = true;
@@ -469,7 +461,7 @@ async function refreshTree() {
   const cols = placeByRank(root, dy);
 
   // column headers (rank names) above the tree
-  const top = d3.min(root.descendants(), (d) => d.x) - 70; // room for the fold buttons above the top node
+  const top = d3.min(root.descendants(), (d) => d.x) - 44;
   // tap a header: fold everything up to this column; "Organismen" or the active header again: unfold all
   const heads = g.append("g").selectAll("g").data(cols.filter((c) => c.label)).join("g")
     .attr("class", (c) => "rank-head-g" + (c.r != null && c.r === foldLevel ? " active" : ""))
@@ -527,14 +519,12 @@ async function refreshTree() {
 
   // fold toggle (−/+) on every node that has children
   const foldable = node.filter((d) => d.data.type === "taxon" && d.data.children.length);
-  const tog = foldable.append("g").attr("class", "fold")
+  const tog = foldable.append("g").attr("class", "fold").attr("transform", "translate(17,-17)")
     .on("click", (e, d) => { e.stopPropagation(); hideTip(); toggleFold(d.data.taxon.key); });
-  tog.append("circle").attr("r", 14).attr("fill", "transparent"); // bigger touch target
+  tog.append("circle").attr("r", 20).attr("fill", "transparent"); // bigger touch target
   tog.append("circle").attr("class", "fold-btn").attr("r", 11);
-  // drawn, not a font glyph: stays centered on every device
-  tog.append("path").attr("class", "fold-sign")
-    .attr("d", (d) => (isFolded(d.data) ? "M-5,0H5M0,-5V5" : "M-5,0H5"));
-  sizeFoldButtons(d3.zoomTransform(svg.node()).k);
+  tog.append("text").attr("class", "fold-sign").attr("text-anchor", "middle").attr("y", 5.5)
+    .text((d) => (isFolded(d.data) ? "+" : "−"));
   foldable.filter((d) => isFolded(d.data)).append("text").attr("class", "n-sub halo").attr("x", 12).attr("y", 4)
     .text((d) => { const n = countOrgs(d.data); return `${n} ${n === 1 ? "Organismus" : "Organismen"}`; });
 
