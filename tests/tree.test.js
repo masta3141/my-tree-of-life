@@ -43,12 +43,12 @@ test("two mammals split at Mammalia with distinguishing orders", () => {
 
 test("spider adds Animalia split", () => {
   assert.deepEqual(shape(buildTree([cow(), squirrel(), spider()])),
-    ["Eukaryota", [["Animalia", [["Arthropoda", ["Spinne"]], ["Chordata", [MAMMALS]]]]]]);
+    ["Eukaryota", [["Animalia", [["Arthropoda", [["Araneae", ["Spinne"]]]], ["Chordata", [MAMMALS]]]]]]);
 });
 
 test("plant splits at domain", () => {
   assert.deepEqual(shape(buildTree([cow(), squirrel(), spider(), oak()])),
-    ["Eukaryota", [["Animalia", [["Arthropoda", ["Spinne"]], ["Chordata", [MAMMALS]]]], ["Plantae", ["Eiche"]]]]);
+    ["Eukaryota", [["Animalia", [["Arthropoda", [["Araneae", ["Spinne"]]]], ["Chordata", [MAMMALS]]]], ["Plantae", ["Eiche"]]]]);
 });
 
 test("genus and species both recorded", () => {
@@ -66,5 +66,15 @@ test("duplicates share taxon node", () => {
 
 test("multiple domains get super root", () => {
   const bac = { id: 7, label: "E. coli", lineage: [T("dom:Bacteria", "Bacteria", "domain"), T("3", "Bacteria", "kingdom")] };
-  assert.deepEqual(shape(buildTree([cow(), bac])), ["Leben", [["Bacteria", ["E. coli"]], ["Eukaryota", ["Kuh"]]]]);
+  assert.deepEqual(shape(buildTree([cow(), bac])), ["Leben", [["Bacteria", [["Bacteria", ["E. coli"]]]], ["Eukaryota", ["Kuh"]]]]);
+});
+
+test("organism identified only to phylum keeps its taxon node", () => {
+  const TAR = T("14", "Tardigrada", "phylum");
+  const tardi = { id: 8, label: "Bärtierchen", lineage: [EUK, ANI, TAR] };
+  const t = buildTree([cow(), tardi]);
+  assert.deepEqual(shape(t), ["Eukaryota", [["Animalia", [["Chordata", ["Kuh"]], ["Tardigrada", ["Bärtierchen"]]]]]]);
+  const tarNode = t.children[0].children[1];
+  assert.equal(tarNode.type, "taxon");
+  assert.equal(tarNode.children[0].taxon.key, "14");
 });

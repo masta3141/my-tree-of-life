@@ -478,7 +478,13 @@ async function refreshTree() {
 
   const linkPath = d3.linkHorizontal().x((d) => d.y).y((d) => d.x);
   const links = g.append("g").selectAll("g").data(root.links()).join("g");
-  links.append("path").attr("class", "link").attr("d", linkPath);
+  // organism identified only down to its parent's rank: dashed link with a hint
+  const coarse = (l) => l.target.data.type === "organism" && l.target.data.taxon.key === l.source.data.taxon.key;
+  links.append("path").attr("class", (l) => "link" + (coarse(l) ? " coarse" : "")).attr("d", linkPath);
+  links.filter(coarse).append("text").attr("class", "n-sub halo")
+    .attr("x", (l) => (l.source.y + l.target.y) / 2).attr("y", (l) => (l.source.x + l.target.x) / 2 - 5)
+    .attr("text-anchor", "middle").style("pointer-events", "none")
+    .text((l) => `nur bis ${RANK_DE[l.source.data.taxon.rank] || l.source.data.taxon.rank} bestimmt`);
   links.filter((l) => l.target.data.collapsed.length)
     .append("path").attr("class", "link-hit").attr("d", linkPath)
     .on("mousemove", (e, l) => showTip(e, `<div class="small muted" style="margin-bottom:4px">Übersprungen:</div>` +

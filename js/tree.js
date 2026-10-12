@@ -8,6 +8,11 @@
 // Taxon:    { key, name, rank, name_de }
 // Organism: { id, label, lineage: Taxon[], image }
 
+// ranks above species: an organism identified only this far keeps its own taxon node,
+// so it sits in the right rank column instead of being merged into the organism leaf
+const COARSE = new Set(["domain", "kingdom", "subkingdom", "phylum", "subphylum", "class", "subclass", "order",
+  "suborder", "family", "subfamily", "tribe", "genus", "subgenus"]);
+
 const taxonOut = (t) => ({ key: t.key, name: t.name, rank: t.rank, name_de: t.name_de ?? null });
 
 function organismOut(o, collapsed) {
@@ -25,7 +30,7 @@ function organismOut(o, collapsed) {
 // `keep` marks the first taxon of a branch below a split: it is the taxon that
 // tells the branches apart, so it stays visible even with a single child.
 function emit(node, collapsed, isRoot, keep) {
-  if (!isRoot && node.children.size === 0 && node.organisms.length === 1) {
+  if (!isRoot && node.children.size === 0 && node.organisms.length === 1 && !COARSE.has(node.taxon.rank)) {
     // leaf taxon with exactly one organism: show the organism directly
     return organismOut(node.organisms[0], collapsed);
   }
