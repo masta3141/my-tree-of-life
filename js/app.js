@@ -1,6 +1,6 @@
-import * as store from "./store.js";
-import { settings, saveSettings, DEFAULT_MODEL } from "./settings.js";
-import { t, lang, setLang, rankName, taxonName, reasoningOf, commonNameOf } from "./i18n.js";
+import * as store from "./store.js?v=7";
+import { settings, saveSettings, DEFAULT_MODEL } from "./settings.js?v=7";
+import { t, lang, setLang, rankName, taxonName, reasoningOf, commonNameOf } from "./i18n.js?v=7";
 
 const $ = (id) => document.getElementById(id);
 let imageFile = null;

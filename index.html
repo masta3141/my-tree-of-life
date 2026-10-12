@@ -233,6 +233,7 @@
   addEventListener("error", (e) => showErr(e.message));
   addEventListener("unhandledrejection", (e) => showErr(e.reason?.message || e.reason));
 </script>
-<script type="module" src="js/app.js?v=6"></script>
+<!-- bump ?v= here and in all imports in js/*.js on every release, otherwise browsers mix cached modules -->
+<script type="module" src="js/app.js?v=7"></script>
 </body>
 </html>

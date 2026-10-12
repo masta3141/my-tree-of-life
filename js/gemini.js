@@ -1,7 +1,7 @@
 // Gemini REST client (runs in the browser with the user's own API key).
 
-import { settings } from "./settings.js";
-import { t, lang } from "./i18n.js";
+import { settings } from "./settings.js?v=7";
+import { t, lang } from "./i18n.js?v=7";
 
 const API = "https://generativelanguage.googleapis.com/v1beta/models";
 
