@@ -152,7 +152,10 @@ function openDetail(id, html) {
   detail.querySelector(".close").onclick = closeDetail;
   wireChips(detail);
 }
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDetail(); });
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (!detail.hidden) closeDetail(); else leaveFs(false);
+});
 
 function wireChips(root) {
   root.querySelectorAll("[data-taxon]").forEach((c) => (c.onclick = () => showTaxon(c.dataset.taxon)));
@@ -360,6 +363,7 @@ const zoom = d3.zoom().scaleExtent([0.2, 3]).on("zoom", (e) => g.attr("transform
 svg.call(zoom);
 const tip = $("tip");
 let firstRender = true;
+let fitTree = () => {};
 
 function showTip(evt, html) {
   tip.innerHTML = html; tip.style.display = "block";
@@ -464,23 +468,58 @@ async function refreshTree() {
   leaf.append("text").attr("class", "n-name halo").attr("x", 26).attr("y", -2).text((d) => d.data.label);
   leaf.append("text").attr("class", "n-sci halo").attr("x", 26).attr("y", 13).text((d) => d.data.taxon.name);
 
-  if (firstRender) {
+  const [x0, x1] = d3.extent(root.descendants(), (d) => d.x);
+  const [y0, y1] = d3.extent(root.descendants(), (d) => d.y);
+  fitTree = () => {
     const box = $("svg").getBoundingClientRect();
-    const [x0, x1] = d3.extent(root.descendants(), (d) => d.x);
-    const [y0, y1] = d3.extent(root.descendants(), (d) => d.y);
     // fit the whole tree (plus label space on both sides) into the view, never zoom in beyond 1
     const left = Math.min(120, box.width * 0.2), labelRight = 190; // px left of the root, tree units for leaf labels
     // fit, but stay readable (small screens pan/pinch instead)
     const k = Math.max(0.45, Math.min(1, (box.width - left - 16) / (y1 - y0 + labelRight), box.height / (x1 - x0 + 160)));
     svg.call(zoom.transform, d3.zoomIdentity.translate(left - k * y0, box.height / 2 - k * (x0 + x1) / 2).scale(k));
-    firstRender = false;
-  }
+  };
+  if (firstRender) { fitTree(); firstRender = false; }
 }
+
+// ---------- fullscreen tree ----------
+const mainEl = document.querySelector("main");
+const isMobile = () => matchMedia("(max-width: 760px)").matches;
+const refitSoon = () => setTimeout(() => fitTree(), 250); // after layout/rotation settled
+
+async function enterFs() {
+  if (mainEl.classList.contains("fs")) return;
+  mainEl.classList.add("fs");
+  history.pushState({ fs: true }, ""); // hardware back button leaves fullscreen
+  try {
+    await mainEl.requestFullscreen?.({ navigationUI: "hide" });
+    await screen.orientation?.lock?.("landscape");
+  } catch { /* not supported (e.g. iPhone): stays as full-window overlay */ }
+  refitSoon();
+}
+function leaveFs(fromHistory) {
+  if (!mainEl.classList.contains("fs")) return;
+  mainEl.classList.remove("fs");
+  hideTip();
+  try { screen.orientation?.unlock?.(); } catch {}
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  if (!fromHistory && history.state?.fs) history.back();
+  refitSoon();
+}
+$("btnFs").onclick = enterFs;
+$("btnFsBack").onclick = () => leaveFs(false);
+window.addEventListener("popstate", () => leaveFs(true));
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement) leaveFs(false); });
+window.addEventListener("orientationchange", refitSoon);
+// on phones a tap on empty tree space opens fullscreen
+$("svg").addEventListener("click", (e) => {
+  if (isMobile() && !mainEl.classList.contains("fs") && !e.target.closest(".clickable, .link-hit")) enterFs();
+});
 
 async function refresh() {
   try { await Promise.all([refreshList(), refreshTree()]); }
   catch (e) { $("error").textContent = e.message; }
 }
 
+if (isMobile()) $("listBox").open = false;
 renderSettingsState();
 refresh();

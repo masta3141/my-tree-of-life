@@ -121,6 +121,18 @@
   .foot { margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--line); }
   .foot .row { margin-top: 6px; }
   .foot button { font-size: 12px; padding: 5px 10px; }
+  details > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::before { content: "▸"; color: var(--muted); font-size: 12px; margin-top: 16px; transition: transform .15s; }
+  details[open] > summary::before { transform: rotate(90deg); }
+  details > summary h2 { margin: 16px 0 8px; }
+  .fs-btn, .fs-back { position: absolute; z-index: 5; background: var(--panel); box-shadow: 0 2px 10px #0002; }
+  .fs-btn { right: 12px; bottom: 12px; font-size: 18px; padding: 6px 11px; }
+  .fs-back { display: none; left: 12px; top: 12px; font-weight: 600; }
+  main.fs { position: fixed; inset: 0; z-index: 100; background: var(--bg); }
+  main.fs .fs-btn { display: none; }
+  main.fs .fs-back { display: block; }
+  main.fs #detail { left: auto; right: 12px; top: 12px; width: min(380px, calc(100% - 24px)); }
   @media (max-width: 760px) {
     .app { grid-template-columns: 1fr; grid-template-rows: auto 70vh; height: auto; }
     aside { border-right: none; border-bottom: 1px solid var(--line); }
@@ -159,8 +171,10 @@
     <div id="error" class="err"></div>
     <div id="proposal"></div>
 
-    <h2>Erfasst <span id="count" class="muted"></span></h2>
-    <ul class="list" id="list"></ul>
+    <details id="listBox" open>
+      <summary><h2>Erfasst <span id="count" class="muted"></span></h2></summary>
+      <ul class="list" id="list"></ul>
+    </details>
 
     <div class="foot">
       <div class="small muted">Deine Sammlung liegt nur in diesem Browser. Sichere sie ab und zu.</div>
@@ -175,6 +189,8 @@
     <svg id="svg"></svg>
     <div class="empty" id="empty" hidden>Noch nichts erfasst. Fang links an.</div>
     <div id="tip"></div>
+    <button class="fs-btn" id="btnFs" title="Vollbild">⛶</button>
+    <button class="fs-back" id="btnFsBack">← Zurück</button>
     <div id="detail" hidden></div>
   </main>
 </div>
