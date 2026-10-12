@@ -135,9 +135,17 @@
   .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
   .head h1 { margin: 0; }
   .head-btns { display: flex; align-items: center; gap: 2px; }
-  .flag { display: grid; place-items: center; padding: 4px 6px; opacity: .85; }
-  .flag:hover { opacity: 1; }
-  .flag svg { width: 20px; height: 13px; display: block; border-radius: 2px; box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
+  .lang { position: relative; }
+  .flag { display: flex; align-items: center; gap: 4px; padding: 4px 6px; font-size: 10px; }
+  .flag svg, .lang-menu svg { width: 20px; height: 13px; display: block; border-radius: 2px; box-shadow: 0 0 0 1px var(--line);
+    cursor: pointer; flex: none; }
+  .lang-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 140px; padding: 4px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 20px #0003; }
+  .lang-menu button { display: flex; align-items: center; gap: 10px; width: 100%; border: none; background: none;
+    padding: 7px 10px; text-align: left; }
+  .lang-menu button:hover { background: var(--bg); }
+  .lang-menu button.on { font-weight: 600; }
+  .lang-menu button.on::after { content: "✓"; margin-left: auto; color: var(--accent); }
   .icon-btn { border: none; background: none; font-size: 18px; padding: 2px 6px; color: var(--muted); }
   .icon-btn:hover { color: var(--fg); }
   .settings { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 14px; background: var(--bg); }
@@ -177,7 +185,10 @@
     <div class="head">
       <h1>🌳 My Tree of Life</h1>
       <div class="head-btns">
-        <button class="icon-btn flag" id="btnLang"></button>
+        <div class="lang">
+          <button class="icon-btn flag" id="btnLang" data-i18n-title="language" aria-haspopup="menu"></button>
+          <div class="lang-menu" id="langMenu" role="menu" hidden></div>
+        </div>
         <button class="icon-btn" id="btnSettings" data-i18n-title="settings">⚙</button>
       </div>
     </div>
@@ -196,10 +207,6 @@
         <button id="btnImport" data-i18n="import"></button><input type="file" id="importFile" accept="application/json,.json" hidden>
       </div>
       <div class="small muted" id="ioState"></div>
-      <label style="margin-top:18px" data-i18n="set.translate"></label>
-      <div class="small muted" data-i18n="set.translateHint"></div>
-      <div class="row"><button id="btnTranslate" data-i18n="set.translateBtn"></button></div>
-      <div class="small muted" id="trState"></div>
     </div>
 
     <div class="composer" id="drop">
@@ -234,6 +241,6 @@
   addEventListener("unhandledrejection", (e) => showErr(e.reason?.message || e.reason));
 </script>
 <!-- bump ?v= here and in all imports in js/*.js on every release, otherwise browsers mix cached modules -->
-<script type="module" src="js/app.js?v=7"></script>
+<script type="module" src="js/app.js?v=9"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
-import * as store from "./store.js?v=7";
-import { settings, saveSettings, DEFAULT_MODEL } from "./settings.js?v=7";
-import { t, lang, setLang, rankName, taxonName, reasoningOf, commonNameOf } from "./i18n.js?v=7";
+import * as store from "./store.js?v=9";
+import { settings, saveSettings, DEFAULT_MODEL } from "./settings.js?v=9";
+import { t, lang, LANGS, setLang, rankName, taxonName, reasoningOf, commonNameOf } from "./i18n.js?v=9";
 
 const $ = (id) => document.getElementById(id);
 let imageFile = null;
@@ -29,14 +29,15 @@ function status(text) {
 }
 
 // ---------- language ----------
+const LANG_NAMES = { de: "Deutsch", en: "English" };
 const FLAGS = {
-  de: `<svg viewBox="0 0 5 3"><rect width="5" height="1" fill="#000"/><rect y="1" width="5" height="1" fill="#d00"/><rect y="2" width="5" height="1" fill="#ffce00"/></svg>`,
-  en: `<svg viewBox="0 0 60 30"><clipPath id="ukT"><path d="M30,15h30v15zv15h-30zh-30v-15zv-15h30z"/></clipPath>
+  de: () => `<svg viewBox="0 0 5 3"><rect width="5" height="1" fill="#000"/><rect y="1" width="5" height="1" fill="#d00"/><rect y="2" width="5" height="1" fill="#ffce00"/></svg>`,
+  // the flag is drawn more than once, so each copy gets its own clipPath id
+  en: (id) => `<svg viewBox="0 0 60 30"><clipPath id="${id}"><path d="M30,15h30v15zv15h-30zh-30v-15zv-15h30z"/></clipPath>
     <rect width="60" height="30" fill="#012169"/><path d="M0,0L60,30M60,0L0,30" stroke="#fff" stroke-width="6"/>
-    <path d="M0,0L60,30M60,0L0,30" clip-path="url(#ukT)" stroke="#c8102e" stroke-width="4"/>
+    <path d="M0,0L60,30M60,0L0,30" clip-path="url(#${id})" stroke="#c8102e" stroke-width="4"/>
     <path d="M30,0v30M0,15h60" stroke="#fff" stroke-width="10"/><path d="M30,0v30M0,15h60" stroke="#c8102e" stroke-width="6"/></svg>`,
 };
-const otherLang = () => (lang === "de" ? "en" : "de");
 
 // static texts in index.html carry data-i18n (text), data-i18n-html, data-i18n-title, data-i18n-placeholder
 function applyStatic() {
@@ -45,13 +46,21 @@ function applyStatic() {
   document.querySelectorAll("[data-i18n-title]").forEach((el) => (el.title = t(el.dataset.i18nTitle)));
   document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => (el.placeholder = t(el.dataset.i18nPlaceholder)));
   document.querySelector('meta[name="description"]').content = t("meta.description");
-  // the flag shows the language you switch to
-  $("btnLang").innerHTML = FLAGS[otherLang()];
-  $("btnLang").title = t("lang.switch");
+  // language picker: current flag, menu with flag + name per language
+  $("btnLang").innerHTML = FLAGS[lang]("ukBtn") + `<span class="muted">▾</span>`;
+  $("langMenu").innerHTML = LANGS.map((l) =>
+    `<button role="menuitem" data-lang="${l}" class="${l === lang ? "on" : ""}">${FLAGS[l]("uk" + l)}${LANG_NAMES[l]}</button>`).join("");
 }
 
-$("btnLang").onclick = async () => {
-  setLang(otherLang());
+$("btnLang").onclick = (e) => { e.stopPropagation(); $("langMenu").hidden = !$("langMenu").hidden; };
+document.addEventListener("click", () => ($("langMenu").hidden = true));
+$("langMenu").onclick = (e) => {
+  const l = e.target.closest("[data-lang]")?.dataset.lang;
+  if (l && l !== lang) switchLang(l);
+};
+
+async function switchLang(l) {
+  setLang(l);
   applyStatic();
   if (current) showProposal(current);
   const open = detailOf;
@@ -64,7 +73,7 @@ $("btnLang").onclick = async () => {
       .then((r) => { if (r.names) refresh(); })
       .catch((e) => console.warn("Background translation failed", e));
   }
-};
+}
 
 // ---------- settings ----------
 function renderSettingsState() {
@@ -81,17 +90,6 @@ $("btnSaveSettings").onclick = () => {
   saveSettings({ apiKey: $("setKey").value.trim(), model: $("setModel").value.trim() || DEFAULT_MODEL });
   $("settings").hidden = true;
   renderSettingsState();
-};
-
-$("btnTranslate").onclick = async () => {
-  const btn = $("btnTranslate");
-  btn.disabled = true;
-  try {
-    const r = await store.translateCollection({ onStep: (m) => ($("trState").innerHTML = loadingHtml(m)) });
-    $("trState").textContent = r.names || r.descriptions ? t("translated", r.names, r.descriptions) : t("nothingToTranslate");
-    refresh();
-  } catch (e) { $("trState").textContent = t("error", e.message); }
-  finally { btn.disabled = false; }
 };
 
 // ---------- input ----------

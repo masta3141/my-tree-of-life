@@ -16,7 +16,7 @@ die Domäne, mit jedem weiteren wächst er genau dort, wo sich die Wege trennen.
   Wikimedia Commons (von Gemini bewertet, mit Urheber- und Lizenzangabe)
 - Export/Import der Sammlung als Datei (erneuter Import ergänzt vorhandene Einträge statt sie zu verdoppeln)
 - Deutsch und Englisch (Flagge neben ⚙): Namen, Beschreibungen und Bezeichnungen werden in beiden Sprachen
-  gespeichert, Fehlendes ergänzt Gemini (⚙ → „Sammlung übersetzen“)
+  gespeichert, Fehlendes ergänzt Gemini
 
 ## Datenschutz
 
