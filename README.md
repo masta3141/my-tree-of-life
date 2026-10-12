@@ -12,7 +12,7 @@ die Domäne, mit jedem weiteren wächst er genau dort, wo sich die Wege trennen.
 - Bestimmung per Text und/oder Bild (Gemini), Alternativen und manuelle Korrektur
 - Minimaler Baum, Spalten nach Rang (Domäne, Reich, Stamm, Klasse, Ordnung, Familie …)
 - Beschreibungen und kennzeichnende Merkmale für jeden Knoten
-- Eigene Bilder pro Organismus, plus Suche nach frei lizenzierten Fotos bei iNaturalist und
+- Eigene Bilder pro Organismus (beim Speichern auf 1600 px verkleinert, mit Vorschaubild für Liste und Baum), plus Suche nach frei lizenzierten Fotos bei iNaturalist und
   Wikimedia Commons (von Gemini bewertet, mit Urheber- und Lizenzangabe)
 - Export/Import der Sammlung als Datei (erneuter Import ergänzt vorhandene Einträge statt sie zu verdoppeln)
 - Deutsch und Englisch (Flagge neben ⚙): Namen, Beschreibungen und Bezeichnungen werden in beiden Sprachen
@@ -54,6 +54,7 @@ Tests der Baum-Logik: `npm test` (Node ≥ 20, keine Abhängigkeiten).
 | `js/gemini.js` | Gemini-REST-Aufrufe |
 | `js/images.js` | Bildsuche iNaturalist / Commons mit Lizenzfilter |
 | `js/settings.js` | API-Key und Modell (pro Browser) |
+| `js/resize.js` | Fotos verkleinern, Vorschaubilder |
 | `js/i18n.js` | Sprache, UI-Texte Deutsch/Englisch, zweisprachige Datenfelder |
 
 ## Bildlizenzen

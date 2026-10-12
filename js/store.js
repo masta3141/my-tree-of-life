@@ -1,10 +1,11 @@
 // Browser-side data layer: IndexedDB storage + the logic the Python backend used to do.
 
-import * as gbif from "./gbif.js?v=9";
-import * as gemini from "./gemini.js?v=9";
-import * as images from "./images.js?v=9";
-import { buildTree } from "./tree.js?v=9";
-import { t as tr, lang, labelOf, taxonInfo } from "./i18n.js?v=9";
+import * as gbif from "./gbif.js?v=10";
+import * as gemini from "./gemini.js?v=10";
+import * as images from "./images.js?v=10";
+import { buildTree } from "./tree.js?v=10";
+import { tryDownscale, PHOTO_MAX, THUMB_MAX } from "./resize.js?v=10";
+import { t as tr, lang, labelOf, taxonInfo } from "./i18n.js?v=10";
 
 const DOMAIN_NAMES = {
   Eukaryota: { de: "Eukaryoten", en: "Eukaryotes" },
@@ -67,16 +68,48 @@ function lineageOf(taxa, key) {
   return out;
 }
 
-const urlCache = new Map(); // image id -> object URL
+const urlCache = new Map(); // image id (thumbnails: "t" + id) -> object URL
 function imageUrl(img) {
   if (!img) return null;
   if (!urlCache.has(img.id)) urlCache.set(img.id, URL.createObjectURL(img.blob));
   return urlCache.get(img.id);
 }
+// small version for list, tree and gallery tiles; falls back to the photo until the thumbnail exists
+function thumbUrl(img) {
+  if (!img?.thumb) return imageUrl(img);
+  const k = "t" + img.id;
+  if (!urlCache.has(k)) urlCache.set(k, URL.createObjectURL(img.thumb));
+  return urlCache.get(k);
+}
 function forgetUrl(id) {
-  const u = urlCache.get(id);
-  if (u) URL.revokeObjectURL(u);
-  urlCache.delete(id);
+  for (const k of [id, "t" + id]) {
+    const u = urlCache.get(k);
+    if (u) URL.revokeObjectURL(u);
+    urlCache.delete(k);
+  }
+}
+
+// Downscale a new photo and make its thumbnail (before the transaction: no awaiting non-IndexedDB work inside one).
+async function preparePhoto(blob) {
+  const photo = await tryDownscale(blob, PHOTO_MAX);
+  return { blob: photo, thumb: await tryDownscale(photo, THUMB_MAX, null) };
+}
+
+// Images stored before thumbnails existed (or imported) get one on first use; one job per image.
+const thumbJobs = new Map();
+function ensureThumbs(imgs) {
+  return Promise.all(imgs.filter((i) => !i.thumb).map((i) => {
+    if (!thumbJobs.has(i.id)) thumbJobs.set(i.id, (async () => {
+      const thumb = await tryDownscale(i.blob, THUMB_MAX, null);
+      if (!thumb) return null;
+      await tx("images", "readwrite", async (s) => {
+        const cur = await req(s.images.get(i.id));
+        if (cur && !cur.thumb) s.images.put({ ...cur, thumb });
+      });
+      return thumb;
+    })());
+    return thumbJobs.get(i.id).then((thumb) => { if (thumb) i.thumb = thumb; });
+  }));
 }
 
 // cover image of an organism: the chosen one, else the oldest
@@ -89,7 +122,7 @@ function imagesByOrganism(all) {
 }
 
 const imageOut = (i) => ({
-  id: i.id, url: imageUrl(i), source: i.source, is_cover: !!i.is_cover,
+  id: i.id, url: imageUrl(i), thumb: thumbUrl(i), source: i.source, is_cover: !!i.is_cover,
   license: i.license, license_url: i.license_url, credit: i.credit, source_url: i.source_url,
 });
 
@@ -149,6 +182,7 @@ export async function lookup(name, names = {}) {
 
 export async function createOrganism({ proposal: p, inputText, label, imageBlob }) {
   const lineage = p.lineage.map((t) => ({ ...t }));
+  const photo = imageBlob ? await preparePhoto(imageBlob) : null;
   // label in both languages: Gemini's common names, unless the user typed their own one
   // (then the other language stays empty until "translate collection" fills it in)
   const labels = { de: p.common_name_de || null, en: p.common_name_en || null };
@@ -187,13 +221,13 @@ export async function createOrganism({ proposal: p, inputText, label, imageBlob 
       gemini: p.gemini || null,
       created_at: new Date().toISOString(),
     }));
-    if (imageBlob) s.images.add(newImage(id, imageBlob, { source: "upload", is_cover: 1 }));
+    if (photo) s.images.add(newImage(id, photo, { source: "upload", is_cover: 1 }));
     return id;
   });
 }
 
-const newImage = (organism_id, blob, meta) => ({
-  organism_id, blob, source: meta.source, is_cover: meta.is_cover ? 1 : 0,
+const newImage = (organism_id, { blob, thumb }, meta) => ({
+  organism_id, blob, thumb, source: meta.source, is_cover: meta.is_cover ? 1 : 0,
   license: meta.license ?? null, license_url: meta.license_url ?? null,
   credit: meta.credit ?? null, source_url: meta.source_url ?? null,
   created_at: new Date().toISOString(),
@@ -206,13 +240,15 @@ export async function listOrganisms() {
     tx("images", "readonly", (s) => getAll(s.images)),
   ]);
   const byOrg = imagesByOrganism(imgs);
+  const covers = new Map(orgs.map((o) => [o.id, coverOf(byOrg.get(o.id) || [])]));
+  await ensureThumbs([...covers.values()].filter(Boolean));
   return orgs
     .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id - a.id)
     .map((o) => {
       const t = taxa.get(o.taxon_key);
       return {
         id: o.id, label: labelOf(o), scientific_name: t?.name, rank: t?.rank,
-        image: imageUrl(coverOf(byOrg.get(o.id) || [])), created_at: o.created_at,
+        image: thumbUrl(covers.get(o.id)), created_at: o.created_at,
         lineage: lineageOf(taxa, o.taxon_key),
       };
     });
@@ -227,6 +263,7 @@ export async function getOrganism(id) {
   if (!o) throw new Error(tr("err.notFound"));
   const t = taxa.get(o.taxon_key);
   imgs.sort((a, b) => b.is_cover - a.is_cover || a.id - b.id);
+  await ensureThumbs(imgs);
   return {
     id: o.id, label: labelOf(o), scientific_name: t?.name, rank: t?.rank, taxon_key: o.taxon_key,
     image: imageUrl(coverOf(imgs)), images: imgs.map(imageOut),
@@ -256,9 +293,10 @@ export async function deleteOrganism(id) {
 // ---------- images ----------
 
 async function addImage(organismId, blob, meta) {
+  const photo = await preparePhoto(blob);
   return tx("images", "readwrite", async (s) => {
     const existing = await req(s.images.index("organism_id").getAll(organismId));
-    return req(s.images.add(newImage(organismId, blob, { ...meta, is_cover: !existing.some((i) => i.is_cover) })));
+    return req(s.images.add(newImage(organismId, photo, { ...meta, is_cover: !existing.some((i) => i.is_cover) })));
   });
 }
 
@@ -379,7 +417,7 @@ export async function exportData() {
     Promise.all([getAll(s.taxa), getAll(s.organisms), getAll(s.images)]));
   const imagesOut = [];
   for (const i of imgs) {
-    const { blob, ...meta } = i;
+    const { blob, thumb: _t, ...meta } = i; // thumbnails are rebuilt after import
     imagesOut.push({ ...meta, mime: blob.type || "image/jpeg", data: await gemini.blobToBase64(blob) });
   }
   const json = JSON.stringify({ format: FORMAT, version: 1, exported_at: new Date().toISOString(), taxa, organisms, images: imagesOut });

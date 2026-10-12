@@ -1,6 +1,6 @@
-import * as store from "./store.js?v=9";
-import { settings, saveSettings, DEFAULT_MODEL } from "./settings.js?v=9";
-import { t, lang, LANGS, setLang, rankName, taxonName, reasoningOf, commonNameOf } from "./i18n.js?v=9";
+import * as store from "./store.js?v=10";
+import { settings, saveSettings, DEFAULT_MODEL } from "./settings.js?v=10";
+import { t, lang, LANGS, setLang, rankName, taxonName, reasoningOf, commonNameOf } from "./i18n.js?v=10";
 
 const $ = (id) => document.getElementById(id);
 let imageFile = null;
@@ -331,7 +331,7 @@ function renderGallery(o) {
     <div class="gallery">
       ${o.images.map((im) => `
         <div class="ph ${im.is_cover ? "cover" : ""}" data-img="${im.id}" title="${im.is_cover ? t("cover") : t("view")}">
-          <img src="${esc(im.url)}" alt="" loading="lazy">
+          <img src="${esc(im.thumb)}" alt="" loading="lazy">
           <div class="acts">
             <button data-cover="${im.id}" title="${t("asCover")}">★</button>
             <button data-delimg="${im.id}" title="${t("delete")}">✕</button>

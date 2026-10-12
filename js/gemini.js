@@ -1,7 +1,8 @@
 // Gemini REST client (runs in the browser with the user's own API key).
 
-import { settings } from "./settings.js?v=9";
-import { t, lang } from "./i18n.js?v=9";
+import { settings } from "./settings.js?v=10";
+import { t, lang } from "./i18n.js?v=10";
+import { tryDownscale, GEMINI_MAX } from "./resize.js?v=10";
 
 const API = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -40,7 +41,11 @@ export async function blobToBase64(blob) {
   return btoa(s);
 }
 
-const imagePart = async (blob) => ({ inline_data: { mime_type: blob.type || "image/jpeg", data: await blobToBase64(blob) } });
+// photos are sent downscaled: faster upload, no worse identification
+const imagePart = async (blob) => {
+  const small = await tryDownscale(blob, GEMINI_MAX);
+  return { inline_data: { mime_type: small.type || "image/jpeg", data: await blobToBase64(small) } };
+};
 
 const IDENTIFY_PROMPT = `You are a taxonomist. Identify the described and/or pictured organism.
 The input may be in German or English.
