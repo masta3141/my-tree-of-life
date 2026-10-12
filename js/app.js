@@ -31,12 +31,17 @@ $("btnSaveSettings").onclick = () => {
 
 // ---------- input ----------
 const drop = $("drop");
+const isTouch = matchMedia("(pointer: coarse)").matches;
 function setImage(f) {
   imageFile = f;
-  if (!f) { $("dropText").textContent = "Bild hierher ziehen oder klicken (optional)"; return; }
+  if (!f) {
+    $("dropText").textContent = isTouch ? "📷 Über Bild bestimmen (optional)" : "Bild hierher ziehen oder klicken (optional)";
+    return;
+  }
   const url = URL.createObjectURL(f);
-  $("dropText").innerHTML = `<img src="${url}" alt=""><span class="small muted">${esc(f.name)} · klicken zum Ändern</span>`;
+  $("dropText").innerHTML = `<img src="${url}" alt=""><span class="small muted">${esc(f.name)} · ${isTouch ? "tippen" : "klicken"} zum Ändern</span>`;
 }
+setImage(null);
 $("file").addEventListener("change", (e) => setImage(e.target.files[0] || null));
 drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
 drop.addEventListener("dragleave", () => drop.classList.remove("over"));
