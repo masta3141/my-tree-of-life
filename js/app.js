@@ -12,20 +12,19 @@ function busy(btn, on, label) {
   if (label) btn.innerHTML = on ? '<span class="spinner"></span>' : esc(label);
 }
 
-// progress line under the input, with elapsed seconds for slow requests
-let statusTimer = null;
+// spinner + text; slow requests also show elapsed seconds (see ticker below)
+const loadingHtml = (text) =>
+  `<div class="status"><span class="spinner"></span><span>${esc(text)}</span><span class="sec" data-t0="${Date.now()}"></span></div>`;
+setInterval(() => document.querySelectorAll(".sec[data-t0]").forEach((el) => {
+  const sec = Math.floor((Date.now() - el.dataset.t0) / 1000);
+  el.textContent = sec >= 2 ? `${sec} s` : "";
+}), 1000);
+
+// progress line under the input
 function status(text) {
-  clearInterval(statusTimer);
   $("status").hidden = !text;
+  $("status").innerHTML = text ? loadingHtml(text) : "";
   $("drop").classList.toggle("busy", !!text);
-  if (!text) return;
-  const t0 = Date.now();
-  const tick = () => {
-    const sec = Math.floor((Date.now() - t0) / 1000);
-    $("statusText").textContent = sec >= 2 ? `${text} ${sec} s` : text;
-  };
-  tick();
-  statusTimer = setInterval(tick, 1000);
 }
 
 // ---------- settings ----------
@@ -196,7 +195,7 @@ function taxonInfoHtml(t) {
 }
 
 async function loadTaxonInfo(key, slot, guard) {
-  slot.innerHTML = `<p class="muted small">Beschreibung wird geladen …</p>`;
+  slot.innerHTML = loadingHtml("Beschreibung wird geladen, ggf. fragt Gemini nach …");
   try {
     const t = await store.getTaxon(key);
     if (detailOf !== guard) return null;
@@ -210,7 +209,7 @@ async function loadTaxonInfo(key, slot, guard) {
 
 async function showTaxon(key) {
   const id = "t" + key;
-  openDetail(id, `<div class="small muted">lädt …</div><div id="dInfo"></div>`);
+  openDetail(id, `<div id="dInfo"></div>`);
   const t = await loadTaxonInfo(key, $("dInfo"), id);
   if (!t) return;
   openDetail(id, `
@@ -309,7 +308,7 @@ function renderGallery(o) {
   const upload = async (files) => {
     files = [...files].filter((f) => f.type.startsWith("image/"));
     if (!files.length) return;
-    $("dAdd").firstChild.textContent = "…";
+    $("dAdd").firstChild.replaceWith(Object.assign(document.createElement("span"), { className: "spinner" }));
     try { await store.addImages(o.id, files); }
     catch (e) { alert(e.message); }
     reloadGallery(o.id);
@@ -324,7 +323,7 @@ function renderGallery(o) {
 async function findImages(oid) {
   const box = $("dCands"), guard = detailOf, btn = $("dFind");
   btn.disabled = true;
-  box.innerHTML = `<p class="small muted">Suche bei iNaturalist und Wikimedia Commons, Gemini prüft die Treffer …</p>`;
+  box.innerHTML = loadingHtml("Suche bei iNaturalist und Wikimedia Commons, Gemini prüft die Treffer …");
   let res;
   try { res = await store.imageCandidates(oid); }
   catch (e) { box.innerHTML = `<p class="err small">${esc(e.message)}</p>`; return; }
@@ -345,7 +344,7 @@ async function findImages(oid) {
         </div>
       </div>`).join("")}</div>`;
   box.querySelectorAll("[data-take]").forEach((b) => (b.onclick = async () => {
-    b.disabled = true; b.textContent = "…";
+    busy(b, true, "Übernehmen");
     try {
       await store.addRemoteImage(oid, res.candidates[+b.dataset.take]);
       b.textContent = "✓ übernommen";
@@ -580,7 +579,8 @@ async function refreshTree() {
 
 // ---------- fullscreen tree ----------
 const mainEl = document.querySelector("main");
-const isMobile = () => matchMedia("(max-width: 760px)").matches;
+// phones count as mobile in landscape too
+const isMobile = () => matchMedia("(max-width: 760px), (pointer: coarse) and (max-height: 500px)").matches;
 const refitSoon = () => setTimeout(() => fitTree(), 250); // after layout/rotation settled
 
 async function enterFs() {

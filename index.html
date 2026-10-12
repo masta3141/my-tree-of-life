@@ -44,7 +44,8 @@
   .spinner { display: inline-block; width: 1em; height: 1em; border: 2px solid currentColor; border-right-color: transparent;
     border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -.15em; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .status { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: var(--accent); font-size: 13px; }
+  .status { display: flex; align-items: center; gap: 8px; margin: 8px 0; color: var(--accent); font-size: 13px; }
+  .status .sec { color: var(--muted); }
   .thumb { position: relative; flex: none; align-self: center; }
   .thumb img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; display: block; }
   .thumb button { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; padding: 0; border-radius: 50%;
@@ -156,7 +157,7 @@
   main.fs .fs-btn { display: none; }
   main.fs .fs-back { display: block; }
   main.fs #detail { left: auto; right: 12px; top: 12px; width: min(380px, calc(100% - 24px)); }
-  @media (max-width: 760px) {
+  @media (max-width: 760px), (pointer: coarse) and (max-height: 500px) {
     .app { grid-template-columns: 1fr; grid-template-rows: auto 70vh; height: auto; }
     aside { border-right: none; border-bottom: 1px solid var(--line); padding: 12px; }
     .head { margin-bottom: 10px; }
@@ -201,7 +202,7 @@
       <label class="icon-btn" title="Bild hinzufügen">📷<input type="file" id="file" accept="image/*" hidden></label>
       <button class="primary" id="btnIdentify" title="Bestimmen">➜</button>
     </div>
-    <div class="status" id="status" hidden><span class="spinner"></span><span id="statusText"></span></div>
+    <div id="status" hidden></div>
     <div id="error" class="err"></div>
     <div id="proposal"></div>
 
@@ -226,6 +227,6 @@
   addEventListener("error", (e) => showErr(e.message));
   addEventListener("unhandledrejection", (e) => showErr(e.reason?.message || e.reason));
 </script>
-<script type="module" src="js/app.js?v=3"></script>
+<script type="module" src="js/app.js?v=4"></script>
 </body>
 </html>
