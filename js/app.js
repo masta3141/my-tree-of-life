@@ -1,6 +1,6 @@
-import * as store from "./store.js?v=11";
-import { settings, saveSettings, DEFAULT_MODEL } from "./settings.js?v=11";
-import { t, lang, LANGS, setLang, rankName, taxonName, reasoningOf, commonNameOf } from "./i18n.js?v=11";
+import * as store from "./store.js?v=12";
+import { settings, saveSettings, DEFAULT_MODEL } from "./settings.js?v=12";
+import { t, lang, LANGS, setLang, rankName, taxonName, reasoningOf, commonNameOf } from "./i18n.js?v=12";
 
 const $ = (id) => document.getElementById(id);
 let imageFile = null;
@@ -99,6 +99,7 @@ function setImage(f) {
   $("thumb").hidden = !f;
   if (f) $("thumbImg").src = URL.createObjectURL(f);
   else $("file").value = "";
+  if (current && $("btnSave")) $("btnSave").textContent = saveLabel(current);
 }
 $("btnClearImg").onclick = () => setImage(null);
 $("file").addEventListener("change", (e) => setImage(e.target.files[0] || null));
@@ -165,7 +166,7 @@ function showProposal(p) {
         <input type="text" id="correct" placeholder="${esc(t("otherName"))}" style="flex:1">
         <button id="btnCorrect">${t("check")}</button>
       </div>
-      <div class="row"><button class="primary" id="btnSave">${t("save")}</button><button id="btnDiscard">${t("discard")}</button></div>
+      <div class="row"><button class="primary" id="btnSave">${esc(saveLabel(p))}</button><button id="btnDiscard">${t("discard")}</button></div>
     </div>`;
   if (typed && ![p.common_name_de, p.common_name_en].includes(typed)) $("label").value = typed;
   $("proposal").querySelectorAll("[data-alt]").forEach((b) => {
@@ -176,18 +177,29 @@ function showProposal(p) {
   $("btnSave").onclick = save;
 }
 
+// already recorded: don't create it again, only add the photo (if any) to the existing organism
+const saveLabel = (p) => {
+  const dup = p.duplicates[0];
+  return !dup ? t("save") : imageFile ? t("addPhotoTo", dup.label) : t("openExisting", dup.label);
+};
+
 async function save() {
-  busy($("btnSave"), true, t("save"));
+  const label = saveLabel(current), dup = current.duplicates[0];
+  busy($("btnSave"), true, label);
   status(t("step.save"));
   try {
-    await store.createOrganism({
-      proposal: current, inputText: $("text").value.trim(), label: $("label").value.trim(), imageBlob: imageFile,
-    });
+    if (dup) { if (imageFile) await store.addImages(dup.id, [imageFile]); }
+    else {
+      await store.createOrganism({
+        proposal: current, inputText: $("text").value.trim(), label: $("label").value.trim(), imageBlob: imageFile,
+      });
+    }
     $("proposal").innerHTML = ""; current = null;
     $("text").value = ""; autoGrow(); setImage(null);
     store.requestPersistence();
     await refresh();
-  } catch (e) { $("error").textContent = e.message; busy($("btnSave"), false, t("save")); }
+    if (dup) showOrganism(dup.id);
+  } catch (e) { $("error").textContent = e.message; busy($("btnSave"), false, label); }
   finally { status(null); }
 }
 

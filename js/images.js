@@ -1,6 +1,6 @@
 // Freely licensed image candidates from iNaturalist and Wikimedia Commons.
 
-import { t } from "./i18n.js?v=11";
+import { t } from "./i18n.js?v=12";
 
 // iNaturalist license codes we accept (no "all rights reserved", no -nd)
 const INAT_LICENSES = {

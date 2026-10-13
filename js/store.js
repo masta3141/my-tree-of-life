@@ -1,11 +1,11 @@
 // Browser-side data layer: IndexedDB storage + the logic the Python backend used to do.
 
-import * as gbif from "./gbif.js?v=11";
-import * as gemini from "./gemini.js?v=11";
-import * as images from "./images.js?v=11";
-import { buildTree } from "./tree.js?v=11";
-import { tryDownscale, PHOTO_MAX, THUMB_MAX } from "./resize.js?v=11";
-import { t as tr, lang, labelOf, taxonInfo } from "./i18n.js?v=11";
+import * as gbif from "./gbif.js?v=12";
+import * as gemini from "./gemini.js?v=12";
+import * as images from "./images.js?v=12";
+import { buildTree } from "./tree.js?v=12";
+import { tryDownscale, PHOTO_MAX, THUMB_MAX } from "./resize.js?v=12";
+import { t as tr, lang, labelOf, taxonInfo } from "./i18n.js?v=12";
 
 const DOMAIN_NAMES = {
   Eukaryota: { de: "Eukaryoten", en: "Eukaryotes" },
